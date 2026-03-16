@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ww-III</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>ww-III: Real-Time Resource Warfare</h1>
+      <div id="setup">
+        <input id="name" placeholder="Player name" value="Commander" />
+        <button id="createBtn">Create Game</button>
+        <input id="roomInput" placeholder="4-digit room" />
+        <button id="joinBtn">Join Game</button>
+      </div>
+      <div id="roomInfo"></div>
+      <div id="topBar"></div>
+    </header>
+
+    <main class="layout hidden" id="gameLayout">
+      <section class="left">
+        <div class="panel"><h3>Event Log</h3><ul id="events"></ul></div>
+        <div class="panel"><h3>Chat</h3><div id="chat"></div><div class="row"><input id="chatInput" placeholder="Type... /surrender"/><button id="sendChat">Send</button></div></div>
+      </section>
+
+      <section class="center">
+        <div class="tabs" id="tabs"></div>
+        <div class="panel" id="tabContent"></div>
+      </section>
+
+      <section class="right panel">
+        <h3>Opponent Intel</h3>
+        <pre id="intel"></pre>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
