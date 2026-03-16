@@ -155,6 +155,9 @@ function applyGameState(game) {
   state.lastStateAt = Date.now();
   if (!state.game?.opponent?.name) {
     roomInfoEl.textContent = `Room ${state.roomId}. Share this 4-digit code with your opponent.`;
+  } else {
+    document.getElementById('setup').classList.add('hidden');
+    roomInfoEl.textContent = '';
   }
   renderAll();
 }
@@ -176,6 +179,7 @@ async function connectStream() {
   es.addEventListener('state', (evt) => {
     applyGameState(JSON.parse(evt.data));
   });
+  startPollingFallback();
 }
 
 document.getElementById('createBtn').addEventListener('click', async () => {

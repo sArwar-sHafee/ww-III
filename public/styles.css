@@ -9,7 +9,7 @@ header { display: grid; gap: 8px; }
 .left { display: grid; gap: 10px; grid-template-rows: 1fr 1fr; }
 .tabs { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .tab.active { border-color: #70c1ff; }
-.hidden { display: none; }
+.hidden { display: none !important; }
 .red { color: #ff7373; }
 .blink { animation: blinker .9s step-start infinite; }
 @keyframes blinker { 50% { opacity: .3; } }
