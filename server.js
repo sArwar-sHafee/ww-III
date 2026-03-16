@@ -385,7 +385,6 @@ const server = http.createServer(async (req, res) => {
       const room = rooms.get(url.searchParams.get('roomId'));
       const playerId = url.searchParams.get('playerId');
       if (!room || !room.players[playerId]) return writeJson(res, 404, { error: 'Not found' });
-      setCorsHeaders(res);
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache, no-transform',
@@ -407,17 +406,9 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === '/healthz' && req.method === 'GET') {
-      setCorsHeaders(res);
       res.writeHead(200, { 'Content-Type': 'text/plain' });
       res.end('ok');
       return;
-    }
-
-    if (url.pathname === '/api/state' && req.method === 'GET') {
-      const room = rooms.get(url.searchParams.get('roomId'));
-      const playerId = url.searchParams.get('playerId');
-      if (!room || !room.players[playerId]) return writeJson(res, 404, { error: 'Not found' });
-      return writeJson(res, 200, stripStateFor(room, playerId));
     }
 
     if (url.pathname === '/api/action' && req.method === 'POST') {
