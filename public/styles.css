@@ -20,3 +20,8 @@ pre { white-space: pre-wrap; word-break: break-word; }
 .action-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(260px,1fr)); gap: 8px; }
 .card { border: 1px solid #333; padding: 8px; }
 .small { font-size: 12px; color: #bbb; }
+
+#setup { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+#joinFlow { display: flex; gap: 8px; }
+#joinFlow.hidden { display: none; }
+#roomInfo { min-height: 20px; font-weight: 600; }

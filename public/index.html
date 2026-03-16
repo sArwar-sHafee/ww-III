@@ -11,10 +11,13 @@
     <header>
       <h1>ww-III: Real-Time Resource Warfare</h1>
       <div id="setup">
-        <input id="name" placeholder="Player name" value="Commander" />
+        <input id="name" placeholder="Your name" value="Commander" />
         <button id="createBtn">Create Game</button>
-        <input id="roomInput" placeholder="4-digit room" />
         <button id="joinBtn">Join Game</button>
+        <div id="joinFlow" class="hidden">
+          <input id="roomInput" placeholder="Enter 4-digit room code" maxlength="4" inputmode="numeric" />
+          <button id="joinConfirmBtn">Connect</button>
+        </div>
       </div>
       <div id="roomInfo"></div>
       <div id="topBar"></div>
