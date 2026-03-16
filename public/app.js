@@ -1,5 +1,8 @@
 const state = { roomId: null, playerId: null, meta: null, game: null, tab: 'dashboard' };
-const emojis = { nutrition: '🍲', lumber: '🪵', steel: '🔩', alloy: '🪙', oil: '🛢️', magnet: '🧲', electricity: '⚡', glass: '🪟', plastic: '♻️', concrete: '🧱', silicon: '💾' };
+const emojis = {
+  nutrition: '🍲', lumber: '🪵', steel: '🔩', alloy: '🪙', oil: '🛢️', magnet: '🧲', electricity: '⚡', glass: '🪟', plastic: '♻️', concrete: '🧱', silicon: '💾',
+  shipyard: '⚓', airfield: '🛫', war_ship: '🚢', fighter_zed: '✈️'
+};
 const tabs = ['dashboard', 'economy', 'buildings', 'military', 'research', 'war_room'];
 
 const topBar = document.getElementById('topBar');
@@ -78,13 +81,13 @@ function renderTab() {
 
   if (state.tab === 'military') {
     tabContent.innerHTML = `<h3>Military</h3><div class='action-grid'>` + Object.entries(state.meta.units).map(([id, u]) =>
-      `<div class='card'><b>${u.name}</b><div class='small'>Owned: ${you.units[id]}</div><div class='small'>Cost: ${costLine(u.cost)}</div><div class='row'><input id='amt_${id}' value='1' type='number' min='1'/>${actionBtn('Train', () => sendAction('train', { id, amount: Number(document.getElementById(`amt_${id}`).value || 1) }))}</div></div>`
+      `<div class='card'><b>${emojis[id] || ''} ${u.name}</b><div class='small'>Owned: ${you.units[id]}</div><div class='small'>Cost: ${costLine(u.cost)}</div><div class='row'><input id='amt_${id}' value='1' type='number' min='1'/>${actionBtn('Train', () => sendAction('train', { id, amount: Number(document.getElementById(`amt_${id}`).value || 1) }))}</div></div>`
     ).join('') + `</div>
       <h4>War Room Quick Actions</h4>
       <div class='row'>${actionBtn('Queue Scout', () => sendAction('scout', {}))}
       <select id='missileTarget'><option value='economy'>Economy</option><option value='military'>Military</option><option value='support'>Population Centers</option></select>
       ${actionBtn('Queue Missile', () => sendAction('missile', { target: document.getElementById('missileTarget').value }))}</div>
-      <div class='row'><input id='assSold' type='number' value='5' min='0'/><input id='assTank' type='number' value='0' min='0'/>${actionBtn('Queue Assault', () => sendAction('assault', { soldiers: Number(document.getElementById('assSold').value), tanks: Number(document.getElementById('assTank').value) }))}</div>`;
+      <div class='row' title='Commit: Soldier, Tank, War Ship, Fighter Zed'>🪖<input id='ass_soldier' style='width:50px' type='number' value='5' min='0'/> 🛞<input id='ass_tank' style='width:50px' type='number' value='0' min='0'/> 🚢<input id='ass_war_ship' style='width:50px' type='number' value='0' min='0'/> ✈️<input id='ass_fighter_zed' style='width:50px' type='number' value='0' min='0'/>${actionBtn('Queue Assault', () => sendAction('assault', { soldier: Number(document.getElementById('ass_soldier').value), tank: Number(document.getElementById('ass_tank').value), war_ship: Number(document.getElementById('ass_war_ship').value), fighter_zed: Number(document.getElementById('ass_fighter_zed').value) }))}</div>`;
     return;
   }
 
@@ -99,7 +102,7 @@ function renderTab() {
     <p>Queue actions now. All resolve at end of year.</p>
     <div class='row'>${actionBtn('Launch Scout', () => sendAction('scout', {}))}</div>
     <div class='row'><select id='wrTarget'><option value='economy'>Economy</option><option value='military'>Military</option><option value='support'>Population Centers</option></select>${actionBtn('Launch Missile', () => sendAction('missile', { target: document.getElementById('wrTarget').value }))}</div>
-    <div class='row'><input id='wrSold' type='number' value='10' min='0'/><input id='wrTank' type='number' value='1' min='0'/>${actionBtn('Commit Assault', () => sendAction('assault', { soldiers: Number(document.getElementById('wrSold').value), tanks: Number(document.getElementById('wrTank').value) }))}</div>`;
+    <div class='row' title='Commit: Soldier, Tank, War Ship, Fighter Zed'>🪖<input id='wr_soldier' style='width:50px' type='number' value='10' min='0'/> 🛞<input id='wr_tank' style='width:50px' type='number' value='1' min='0'/> 🚢<input id='wr_war_ship' style='width:50px' type='number' value='0' min='0'/> ✈️<input id='wr_fighter_zed' style='width:50px' type='number' value='0' min='0'/>${actionBtn('Commit Assault', () => sendAction('assault', { soldier: Number(document.getElementById('wr_soldier').value), tank: Number(document.getElementById('wr_tank').value), war_ship: Number(document.getElementById('wr_war_ship').value), fighter_zed: Number(document.getElementById('wr_fighter_zed').value) }))}</div>`;
   }
 }
 
