@@ -1,4 +1,6 @@
 const state = { roomId: null, playerId: null, meta: null, game: null, tab: 'dashboard' };
+const DEFAULT_API_ORIGIN = 'https://ww-iii.onrender.com';
+const API_ORIGIN = window.WWIII_API_ORIGIN || (window.location.hostname.endsWith('.vercel.app') ? DEFAULT_API_ORIGIN : '');
 const emojis = {
   nutrition: '🍲', lumber: '🪵', steel: '🔩', alloy: '🪙', oil: '🛢️', magnet: '🧲', electricity: '⚡', glass: '🪟', plastic: '♻️', concrete: '🧱', silicon: '💾',
   shipyard: '⚓', airfield: '🛫', war_ship: '🚢', fighter_zed: '✈️'
@@ -16,7 +18,7 @@ const joinFlowEl = document.getElementById('joinFlow');
 const roomInputEl = document.getElementById('roomInput');
 
 async function api(path, body) {
-  const res = await fetch(path, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const res = await fetch(`${API_ORIGIN}${path}`, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
   const contentType = res.headers.get('content-type') || '';
   if (contentType.includes('application/json')) {
     const json = await res.json();
@@ -149,7 +151,7 @@ function renderAll() {
 }
 
 async function connectStream() {
-  const es = new EventSource(`/api/stream?roomId=${state.roomId}&playerId=${state.playerId}`);
+  const es = new EventSource(`${API_ORIGIN}/api/stream?roomId=${state.roomId}&playerId=${state.playerId}`);
   es.addEventListener('state', (evt) => {
     state.game = JSON.parse(evt.data);
     if (!state.game?.opponent?.name) {

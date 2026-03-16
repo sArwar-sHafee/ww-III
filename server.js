@@ -329,7 +329,14 @@ function parseBody(req) {
   });
 }
 
+function setCorsHeaders(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
 function writeJson(res, status, data) {
+  setCorsHeaders(res);
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(data));
 }
@@ -343,6 +350,13 @@ function queueAction(room, player, action) {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
+
+    if (req.method === 'OPTIONS') {
+      setCorsHeaders(res);
+      res.writeHead(204);
+      res.end();
+      return;
+    }
 
     if (url.pathname === '/api/room/create' && req.method === 'POST') {
       const { name } = await parseBody(req);
