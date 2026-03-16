@@ -1,4 +1,4 @@
-const state = { roomId: null, playerId: null, meta: null, game: null, tab: 'dashboard', stream: null, pollTimer: null, lastStateAt: 0 };
+const state = { roomId: null, playerId: null, meta: null, game: null, tab: 'dashboard' };
 const DEFAULT_API_ORIGIN = 'https://ww-iii.onrender.com';
 const API_ORIGIN = window.WWIII_API_ORIGIN || (window.location.hostname.endsWith('.vercel.app') ? DEFAULT_API_ORIGIN : '');
 const emojis = {
@@ -172,10 +172,7 @@ function startPollingFallback() {
 }
 
 async function connectStream() {
-  if (state.stream) state.stream.close();
-  startPollingFallback();
   const es = new EventSource(`${API_ORIGIN}/api/stream?roomId=${state.roomId}&playerId=${state.playerId}`);
-  state.stream = es;
   es.addEventListener('state', (evt) => {
     applyGameState(JSON.parse(evt.data));
   });
