@@ -10,7 +10,7 @@
 - Damage: 20-35% of targeted category (reduced by Anti-Missile Batteries).
 
 ## Ground Assaults
-- Attacker strength = (soldiers × 10) + (tanks × 25)
-- Defender strength = (remaining soldiers × 5) + (tanks × 12) + (Wall bonus)
+- Attacker strength = (soldiers × 10) + (tanks × 25) + (war_ships × 50) + (fighter_zeds × 40)
+- Defender strength = (remaining soldiers × 5) + (tanks × 12) + (war_ships × 25) + (fighter_zeds × 20) + (Wall bonus)
 - Winner loses 30% committed forces; loser loses 70% plus 1-2 random buildings.
 - Attacker steals 10-20% of one random resource if victorious.

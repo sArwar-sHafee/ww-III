@@ -103,6 +103,8 @@ All buildings take 1–3 years to complete once started. Only one of each type c
 - Barracks: Enables soldier training. Cost: 30 lumber, 20 steel. Build time: 2 years.  
 - Factory: +20% production to all resource buildings when workers assigned. Cost: 40 steel, 25 alloy, 10 oil. Build time: 3 years. Requires Electricity research.  
 - Radar Station: Increases scout accuracy and duration. Cost: 20 steel, 15 alloy, 10 magnet. Build time: 2 years. Requires Advanced Scouting research.  
+- Dry Dock: Enables war ship training. Cost: 40 steel, 25 alloy, 15 oil. Build time: 3 years. Requires Naval Warfare research.
+- Airfield: Enables fighter zed training. Cost: 30 steel, 25 alloy, 10 silicon. Build time: 3 years. Requires Aerial Warfare research.
 
 **Military Buildings** (Military tab)  
 - Missile Silo: Enables missile launches. Cost: 35 steel, 20 oil, 15 alloy. Build time: 3 years. Requires Guided Missiles research. Capacity: 3 missiles stored.  
@@ -112,6 +114,8 @@ All buildings take 1–3 years to complete once started. Only one of each type c
 **Units** (Military tab)  
 - Soldier: Cost: 8 nutrition, 4 steel. Upkeep: 0.5 nutrition per year. Attack power: 10.  
 - Tank: Cost: 12 steel, 8 oil. Upkeep: 1 nutrition + 0.5 oil per year. Attack power: 25. Requires Tanks research.  
+- War Ship: Cost: 30 steel, 20 oil, 15 alloy. Upkeep: 2 nutrition + 1 oil per year. Attack power: 50. Requires Naval Warfare research and Dry Dock.
+- Fighter Zed: Cost: 20 alloy, 15 oil, 10 silicon. Upkeep: 1.5 nutrition + 1 oil + 1 electricity per year. Attack power: 40. Requires Aerial Warfare research and Airfield.
 - Scout Drone: Cost: 5 oil, 3 electricity. Upkeep: 1 electricity per year. Reveals exact opponent buildings and resources for 2 years. Cooldown: 1 year.  
 
 **Research Tree** (Research tab)  
@@ -131,6 +135,8 @@ Tier 3
 - Advanced Scouting: Improves scout drone accuracy. Cost: 25 alloy, 10 magnet. Time: 2 years.  
 - Plastics: Unlocks Plastics Plant. Cost: 30 alloy, 10 oil. Time: 3 years.  
 - Industrial Materials: Unlocks Concrete Plant. Cost: 20 alloy, 5 steel, 5 electricity. Time: 2 years.  
+- Naval Warfare: Unlocks war ship training. Cost: 50 alloy, 25 magnet. Time: 4 years.
+- Aerial Warfare: Unlocks fighter zed training. Cost: 50 alloy, 25 silicon. Time: 4 years.
 
 Tier 4 (End-game)  
 - Nuclear Technology: Unlocks Nuke in War Room. Cost: 100 alloy, 50 magnet, 30 electricity. Time: 5 years.  
@@ -148,9 +154,9 @@ Tier 4 (End-game)
 - Anti-Missile Battery has 35% intercept chance per battery.  
 
 **Ground Assaults**  
-- Select number of soldiers and tanks to commit.  
-- Attacker strength = (soldiers × 10) + (tanks × 25).  
-- Defender strength = (remaining soldiers × 5) + (tanks × 12) + (Wall bonus).  
+- Select number of soldiers, tanks, war ships, and fighter zeds to commit.
+- Attacker strength = (soldiers × 10) + (tanks × 25) + (war_ships × 50) + (fighter_zeds × 40).
+- Defender strength = (remaining soldiers × 5) + (tanks × 12) + (war_ships × 25) + (fighter_zeds × 20) + (Wall bonus).
 - Winner loses 30% of committed forces; loser loses 70% of committed forces plus 1–2 random buildings.  
 - Attacker steals 10–20% of one random resource type if victorious.  
 
