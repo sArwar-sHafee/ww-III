@@ -155,12 +155,13 @@ async function connectStream() {
     if (!state.game?.opponent?.name) {
       roomInfoEl.textContent = `Room ${state.roomId}. Share this 4-digit code with your opponent.`;
     }
-    ensureMeta().then(renderAll).catch((e) => alert(e.message));
+    renderAll();
   });
 }
 
 document.getElementById('createBtn').addEventListener('click', async () => {
   try {
+    state.meta = await api('/api/meta');
     const name = document.getElementById('name').value;
     const data = await api('/api/room/create', { name });
     state.roomId = data.roomId;
@@ -180,6 +181,7 @@ document.getElementById('joinBtn').addEventListener('click', () => {
 
 document.getElementById('joinConfirmBtn').addEventListener('click', async () => {
   try {
+    state.meta = await api('/api/meta');
     const name = document.getElementById('name').value;
     const roomId = roomInputEl.value.trim();
     if (!/^\d{4}$/.test(roomId)) {
