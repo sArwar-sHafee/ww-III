@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const publicDir = path.join(__dirname, 'public');
+const SSE_HEARTBEAT_MS = 15_000;
 
 const YEAR_MS = 30_000;
 const STARTING_RESOURCES = { nutrition: 50, lumber: 30, steel: 20, alloy: 10, oil: 0, magnet: 0, electricity: 0, glass: 0, plastic: 0, concrete: 0, silicon: 0 };
@@ -328,7 +329,14 @@ function parseBody(req) {
   });
 }
 
+function setCorsHeaders(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
 function writeJson(res, status, data) {
+  setCorsHeaders(res);
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(data));
 }
@@ -342,6 +350,13 @@ function queueAction(room, player, action) {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
+
+    if (req.method === 'OPTIONS') {
+      setCorsHeaders(res);
+      res.writeHead(204);
+      res.end();
+      return;
+    }
 
     if (url.pathname === '/api/room/create' && req.method === 'POST') {
       const { name } = await parseBody(req);
@@ -370,12 +385,31 @@ const server = http.createServer(async (req, res) => {
       const room = rooms.get(url.searchParams.get('roomId'));
       const playerId = url.searchParams.get('playerId');
       if (!room || !room.players[playerId]) return writeJson(res, 404, { error: 'Not found' });
-      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+      setCorsHeaders(res);
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no'
+      });
       room.players[playerId].sse = res;
       sendSSE(res, stripStateFor(room, playerId));
+
+      const heartbeat = setInterval(() => {
+        if (!res.writableEnded) res.write(': ping\n\n');
+      }, SSE_HEARTBEAT_MS);
+
       req.on('close', () => {
+        clearInterval(heartbeat);
         if (room.players[playerId]) room.players[playerId].sse = null;
       });
+      return;
+    }
+
+    if (url.pathname === '/healthz' && req.method === 'GET') {
+      setCorsHeaders(res);
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end('ok');
       return;
     }
 
