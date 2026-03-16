@@ -30,12 +30,16 @@ const BUILDINGS = {
   radar_station: { name: 'Radar Station', cost: { steel: 20, alloy: 15, magnet: 10 }, buildTime: 2, requires: ['advanced_scouting'], category: 'support' },
   missile_silo: { name: 'Missile Silo', cost: { steel: 35, oil: 20, alloy: 15 }, buildTime: 3, requires: ['guided_missiles'], category: 'military' },
   anti_missile_battery: { name: 'Anti-Missile Battery', cost: { steel: 30, oil: 15, magnet: 10 }, buildTime: 2, requires: ['guided_missiles'], category: 'military' },
-  wall: { name: 'Wall', cost: { lumber: 50, steel: 30 }, buildTime: 2, category: 'military' }
+  wall: { name: 'Wall', cost: { lumber: 50, steel: 30 }, buildTime: 2, category: 'military' },
+  shipyard: { name: 'Shipyard', cost: { lumber: 50, steel: 40, concrete: 20 }, buildTime: 3, category: 'support' },
+  airfield: { name: 'Airfield', cost: { steel: 60, alloy: 30, concrete: 40 }, buildTime: 3, category: 'support' }
 };
 
 const UNITS = {
   soldier: { name: 'Soldier', cost: { nutrition: 8, steel: 4 }, upkeep: { nutrition: 0.5 }, attack: 10, requiresBuilding: 'barracks' },
   tank: { name: 'Tank', cost: { steel: 12, oil: 8 }, upkeep: { nutrition: 1, oil: 0.5 }, attack: 25, requiresTech: 'tanks', requiresBuilding: 'barracks' },
+  war_ship: { name: 'War Ship', cost: { steel: 50, alloy: 30, oil: 20 }, upkeep: { nutrition: 2, oil: 1 }, attack: 100, requiresTech: 'naval_warfare', requiresBuilding: 'shipyard' },
+  fighter_zed: { name: 'Fighter Zed', cost: { alloy: 40, oil: 20, silicon: 10 }, upkeep: { nutrition: 1, oil: 2 }, attack: 150, requiresTech: 'air_superiority', requiresBuilding: 'airfield' },
   scout_drone: { name: 'Scout Drone', cost: { oil: 5, electricity: 3 }, upkeep: { electricity: 1 }, requiresBuilding: 'radar_station' }
 };
 
@@ -46,6 +50,8 @@ const RESEARCH = {
   industrial_furnaces: { name: 'Industrial Furnaces', cost: { alloy: 20, steel: 5 }, years: 2, prereq: 'basic_tools' },
   advanced_mining: { name: 'Advanced Mining', cost: { alloy: 35, magnet: 15 }, years: 3, prereq: 'electricity' },
   tanks: { name: 'Tanks', cost: { alloy: 40, magnet: 20 }, years: 4, prereq: 'guided_missiles' },
+  naval_warfare: { name: 'Naval Warfare', cost: { alloy: 40, magnet: 20 }, years: 4, prereq: 'basic_tools' },
+  air_superiority: { name: 'Air Superiority', cost: { alloy: 50, silicon: 20 }, years: 4, prereq: 'electricity' },
   advanced_scouting: { name: 'Advanced Scouting', cost: { alloy: 25, magnet: 10 }, years: 2, prereq: 'industrial_furnaces' },
   plastics: { name: 'Plastics', cost: { alloy: 30, oil: 10 }, years: 3, prereq: 'electricity' },
   industrial_materials: { name: 'Industrial Materials', cost: { alloy: 20, steel: 5, electricity: 5 }, years: 2, prereq: 'industrial_furnaces' },
@@ -63,7 +69,7 @@ function createPlayer(playerId, name) {
     resources: { ...STARTING_RESOURCES },
     buildings: Object.fromEntries(Object.keys(BUILDINGS).map((k) => [k, 0])),
     buildingQueues: [],
-    units: { soldier: 0, tank: 0, scout_drone: 0 },
+    units: { soldier: 0, tank: 0, war_ship: 0, fighter_zed: 0, scout_drone: 0 },
     research: { completed: [], active: null },
     eventLog: [],
     chat: [],
@@ -178,18 +184,24 @@ function resolveTick(room) {
         appendEvent(opponent, room.year, '👁️ Scout detected');
       }
       if (action.type === 'assault') {
-        const soldiers = Math.min(action.soldiers || 0, p.units.soldier);
-        const tanks = Math.min(action.tanks || 0, p.units.tank);
-        const atk = soldiers * 10 + tanks * 25;
-        const def = opponent.units.soldier * 5 + opponent.units.tank * 12 + (opponent.buildings.wall > 0 ? 100 : 0);
+        const soldiers = Math.min(action.soldier || 0, p.units.soldier);
+        const tanks = Math.min(action.tank || 0, p.units.tank);
+        const ships = Math.min(action.war_ship || 0, p.units.war_ship);
+        const planes = Math.min(action.fighter_zed || 0, p.units.fighter_zed);
+        const atk = soldiers * 10 + tanks * 25 + ships * 100 + planes * 150;
+        const def = opponent.units.soldier * 5 + opponent.units.tank * 12 + opponent.units.war_ship * 50 + opponent.units.fighter_zed * 75 + (opponent.buildings.wall > 0 ? 100 : 0);
         if (atk > 0) {
           const attackerWon = atk > def;
           const atkLoss = attackerWon ? 0.3 : 0.7;
           const defLoss = attackerWon ? 0.7 : 0.3;
           p.units.soldier -= Math.floor(soldiers * atkLoss);
           p.units.tank -= Math.floor(tanks * atkLoss);
+          p.units.war_ship -= Math.floor(ships * atkLoss);
+          p.units.fighter_zed -= Math.floor(planes * atkLoss);
           opponent.units.soldier = Math.max(0, opponent.units.soldier - Math.floor(opponent.units.soldier * defLoss));
           opponent.units.tank = Math.max(0, opponent.units.tank - Math.floor(opponent.units.tank * defLoss));
+          opponent.units.war_ship = Math.max(0, opponent.units.war_ship - Math.floor(opponent.units.war_ship * defLoss));
+          opponent.units.fighter_zed = Math.max(0, opponent.units.fighter_zed - Math.floor(opponent.units.fighter_zed * defLoss));
           if (attackerWon) {
             const lootResource = RESOURCE_KEYS[Math.floor(Math.random() * RESOURCE_KEYS.length)];
             const pct = 0.1 + Math.random() * 0.1;
@@ -250,24 +262,41 @@ function resolveTick(room) {
 }
 
 function stripStateFor(room, playerId) {
-  const self = room.players[playerId];
+  const p = room.players[playerId];
   const otherId = room.playerOrder.find((x) => x !== playerId);
   const opp = room.players[otherId];
   let intel = { known: false };
-  if (self.scoutIntel && self.scoutIntel.expiresAt >= room.year) {
+  if (opp && p.scoutIntel && p.scoutIntel.expiresAt >= room.year) {
     const approx = {};
     for (const [k, v] of Object.entries(opp.resources)) {
       const variance = Math.floor(v * 0.1);
       approx[k] = Math.max(0, v + (Math.random() < 0.5 ? -variance : variance));
     }
-    intel = { known: true, buildings: opp.buildings, resources: approx, expiresAt: self.scoutIntel.expiresAt };
+    intel = { known: true, buildings: opp.buildings, resources: approx, expiresAt: p.scoutIntel.expiresAt };
   }
   return {
     roomId: room.roomId,
     year: room.year,
     tickEndsAt: room.tickEndsAt,
     winner: room.winner,
-    you: self,
+    you: {
+      playerId: p.playerId,
+      name: p.name,
+      population: p.population,
+      populationMax: p.populationMax,
+      resources: p.resources,
+      buildings: p.buildings,
+      buildingQueues: p.buildingQueues,
+      units: p.units,
+      research: p.research,
+      eventLog: p.eventLog,
+      chat: p.chat,
+      pending: p.pending,
+      scoutCooldownUntil: p.scoutCooldownUntil,
+      scoutIntel: p.scoutIntel,
+      zeroYears: p.zeroYears,
+      net: p.net
+    },
     opponent: { name: opp?.name, intel }
   };
 }
@@ -281,7 +310,11 @@ function broadcastRoom(room) {
   for (const id of room.playerOrder) {
     const player = room.players[id];
     if (!player?.sse) continue;
-    sendSSE(player.sse, stripStateFor(room, id));
+    try {
+      sendSSE(player.sse, stripStateFor(room, id));
+    } catch (e) {
+      player.sse = null;
+    }
   }
 }
 
@@ -415,7 +448,9 @@ const server = http.createServer(async (req, res) => {
     const ctype = ext === '.css' ? 'text/css' : ext === '.js' ? 'text/javascript' : 'text/html';
     res.writeHead(200, { 'Content-Type': ctype });
     res.end(data);
-  } catch {
+  } catch (e) {
+    console.error('Server Error:', e);
+    if (res.writableEnded || res.headersSent) return;
     writeJson(res, 500, { error: 'Server error' });
   }
 });
