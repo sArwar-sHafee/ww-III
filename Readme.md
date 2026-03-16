@@ -19,8 +19,6 @@ This game uses long-lived streaming connections (SSE) for live updates, which do
 - Live URL: https://ww-iii.onrender.com  
 - Render service id: `srv-d6s4054hg0os73evlk5g`  
 - Render blueprint file: `render.yaml` (included in this repo).  
-- If you keep a Vercel-hosted frontend, API calls are automatically routed to the Render origin by `public/app.js` (override with `window.WWIII_API_ORIGIN`).  
-- Client now includes HTTP polling fallback (`/api/state`) so gameplay state still updates if SSE is unstable on a network/proxy.  
 
 **Game Setup**  
 1. Player 1 clicks “Create Game”. The server generates a random 4-digit code and creates a private room.  
