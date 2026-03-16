@@ -11,16 +11,30 @@ const chatEl = document.getElementById('chat');
 const intelEl = document.getElementById('intel');
 const tabContent = document.getElementById('tabContent');
 const tabsEl = document.getElementById('tabs');
+const roomInfoEl = document.getElementById('roomInfo');
+const joinFlowEl = document.getElementById('joinFlow');
+const roomInputEl = document.getElementById('roomInput');
 
 async function api(path, body) {
   const res = await fetch(path, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || 'Request failed');
-  return json;
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Request failed');
+    return json;
+  }
+
+  const text = (await res.text()).trim();
+  const snippet = text.slice(0, 160) || 'empty response';
+  throw new Error(`Unexpected server response (${res.status}) for ${path}: ${snippet}`);
+}
+
+async function ensureMeta() {
+  if (!state.meta) state.meta = await api('/api/meta');
 }
 
 function renderTopBar() {
-  if (!state.game) return;
+  if (!state.game || !state.meta) return;
   const you = state.game.you;
   const items = [`Year ${state.game.year}`, `Population ${you.population}/${you.populationMax}`];
   for (const r of state.meta.resources) {
@@ -138,28 +152,52 @@ async function connectStream() {
   const es = new EventSource(`/api/stream?roomId=${state.roomId}&playerId=${state.playerId}`);
   es.addEventListener('state', (evt) => {
     state.game = JSON.parse(evt.data);
-    document.getElementById('roomInfo').textContent = `Room ${state.roomId} | Share this code with opponent`;
-    renderAll();
+    if (!state.game?.opponent?.name) {
+      roomInfoEl.textContent = `Room ${state.roomId}. Share this 4-digit code with your opponent.`;
+    }
+    ensureMeta().then(renderAll).catch((e) => alert(e.message));
   });
 }
 
 document.getElementById('createBtn').addEventListener('click', async () => {
-  state.meta = await api('/api/meta');
-  const name = document.getElementById('name').value;
-  const data = await api('/api/room/create', { name });
-  state.roomId = data.roomId;
-  state.playerId = data.playerId;
-  connectStream();
+  try {
+    const name = document.getElementById('name').value;
+    const data = await api('/api/room/create', { name });
+    state.roomId = data.roomId;
+    state.playerId = data.playerId;
+    joinFlowEl.classList.add('hidden');
+    roomInfoEl.textContent = `Game created! Your 4-digit code is ${state.roomId}.`;
+    connectStream();
+  } catch (e) {
+    alert(e.message);
+  }
 });
 
-document.getElementById('joinBtn').addEventListener('click', async () => {
-  state.meta = await api('/api/meta');
-  const name = document.getElementById('name').value;
-  const roomId = document.getElementById('roomInput').value;
-  const data = await api('/api/room/join', { roomId, name });
-  state.roomId = data.roomId;
-  state.playerId = data.playerId;
-  connectStream();
+document.getElementById('joinBtn').addEventListener('click', () => {
+  joinFlowEl.classList.toggle('hidden');
+  if (!joinFlowEl.classList.contains('hidden')) roomInputEl.focus();
+});
+
+document.getElementById('joinConfirmBtn').addEventListener('click', async () => {
+  try {
+    const name = document.getElementById('name').value;
+    const roomId = roomInputEl.value.trim();
+    if (!/^\d{4}$/.test(roomId)) {
+      alert('Please enter a valid 4-digit room code.');
+      return;
+    }
+    const data = await api('/api/room/join', { roomId, name });
+    state.roomId = data.roomId;
+    state.playerId = data.playerId;
+    roomInfoEl.textContent = `Joined room ${state.roomId}.`;
+    connectStream();
+  } catch (e) {
+    alert(e.message);
+  }
+});
+
+roomInputEl.addEventListener('keydown', (evt) => {
+  if (evt.key === 'Enter') document.getElementById('joinConfirmBtn').click();
 });
 
 document.getElementById('sendChat').addEventListener('click', async () => {
