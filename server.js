@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const publicDir = path.join(__dirname, 'public');
+const SSE_HEARTBEAT_MS = 15_000;
 
 const YEAR_MS = 30_000;
 const STARTING_RESOURCES = { nutrition: 50, lumber: 30, steel: 20, alloy: 10, oil: 0, magnet: 0, electricity: 0, glass: 0, plastic: 0, concrete: 0, silicon: 0 };
@@ -370,12 +371,29 @@ const server = http.createServer(async (req, res) => {
       const room = rooms.get(url.searchParams.get('roomId'));
       const playerId = url.searchParams.get('playerId');
       if (!room || !room.players[playerId]) return writeJson(res, 404, { error: 'Not found' });
-      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no'
+      });
       room.players[playerId].sse = res;
       sendSSE(res, stripStateFor(room, playerId));
+
+      const heartbeat = setInterval(() => {
+        if (!res.writableEnded) res.write(': ping\n\n');
+      }, SSE_HEARTBEAT_MS);
+
       req.on('close', () => {
+        clearInterval(heartbeat);
         if (room.players[playerId]) room.players[playerId].sse = null;
       });
+      return;
+    }
+
+    if (url.pathname === '/healthz' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end('ok');
       return;
     }
 
