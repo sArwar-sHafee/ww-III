@@ -1,39 +1,184 @@
-# ww-III: Real-Time Resource Warfare (Node.js Build)
+**Game Documentation: Text-Based War Game**
 
-This repository now includes a working Node.js implementation of the 2-player text-based strategy game described in `docs/`.
+**Game Title**  
+ww-III: Real-Time Resource Warfare (2-Player Edition)
 
-## Stack
-- **Node.js HTTP server** (no external packages required)
-- **Server-Sent Events (SSE)** for real-time state updates and chat/event sync
-- **Vanilla HTML/CSS/JS** client UI (text + emoji focused)
+**Version**  
+1.0 (Text-Only Web Implementation)
 
-## What is implemented
-- 4-digit room creation and join flow
-- 10-second countdown when second player joins
-- Server-authoritative 30-second tick loop
-- Tick-order pipeline based on docs:
-  1. Population consumption
-  2. Building production (+tech modifiers)
-  3. Unit upkeep
-  4. Combat/scout queued action resolution
-  5. Resource apply + clamp/capacity
-  6. Population growth/starvation
-  7. Year advance + broadcast
-- Buildings, units, research, war-room action queue
-- Event log (last 10)
-- Chat (`/surrender` supported)
-- Opponent intel visible only while scout intel is active
-- Victory checks (population wipe, resource collapse, surrender)
+**Overview**  
+ww-III is a fully text-based, real-time strategy war game for exactly two players. One player creates a game room and receives a unique 4-digit code. The second player enters that code to join. The game begins immediately when both players are connected.  
 
-## Run locally
-```bash
-npm start
-```
-Then open:
-- `http://localhost:3000`
+Each game year lasts exactly 30 seconds of real time. All actions, production, consumption, and combat resolve simultaneously for both players at the end of every year. The game continues until one player meets a victory condition or the other surrenders.  
 
-Open two browser windows to test both players.
+The interface uses only HTML text, emojis, and optional small animated GIFs for visual feedback. No maps or graphics are used.
 
-## Vercel notes
-This build is Node.js-first and runs as a long-lived process.
-For Vercel deployment, you'll likely want to adapt room state + realtime transport for serverless constraints (e.g., durable store + hosted websocket/SSE broker).
+**Game Setup**  
+1. Player 1 clicks “Create Game”. The server generates a random 4-digit code and creates a private room.  
+2. Player 1 shares the code.  
+3. Player 2 enters the code in “Join Game”.  
+4. Both players see a 10-second countdown.  
+5. The game starts at Year 0 with identical starting conditions for both players.  
+
+All game state is stored on the server. Disconnecting does not end the game; the room remains active until one player wins or both leave.
+
+**Starting Conditions (identical for both players)**  
+- Year: 0  
+- Population: 10 (maximum capacity: 10)  
+- Resources:  
+  - Nutrition: 50  
+  - Lumber: 30  
+  - Steel: 20  
+  - Alloy: 10  
+  - Oil: 0  
+  - Magnet: 0  
+  - Electricity: 0  
+  - Glass: 0  
+  - Plastic: 0  
+  - Concrete: 0  
+  - Silicon: 0  
+
+**Core Mechanics – The Year Tick**  
+Every 30 seconds the server performs the following steps in exact order for both players:  
+1. Population consumes nutrition (0.8 nutrition per person).  
+2. All buildings produce their resources (workers assigned to buildings add extra output).  
+3. Units consume their upkeep.  
+4. Any launched missiles and ground assaults resolve.  
+5. Resource changes are applied.  
+6. Population growth or starvation is calculated.  
+7. New year number is displayed and both screens update instantly.
+
+**Resource Rules**  
+Resources are displayed in the top bar with current total and net change for the next year.  
+- If net change for any resource is negative, the number turns red.  
+- If a resource reaches 0 or below, it stays at 0 and the number turns red and blinks.  
+- If total storage capacity of all related buildings is reached, the resource number turns red and blinks. Excess production is lost.  
+
+**Population Rules**  
+- Base consumption: 0.8 nutrition per person per year.  
+- If nutrition stock reaches 0 or below, 1 person dies every year until nutrition is available again.  
+- Surplus nutrition (more than 10 extra per person) causes +0.2 population growth per year (rounded down).  
+- Houses increase maximum population capacity by 5 each.  
+- Population cannot exceed current house capacity.  
+
+**User Interface Layout**  
+- **Top Bar** (always visible):  
+  Year number | Population (current/max) | Net nutrition change | All resources with emojis and net change (red when negative or at capacity). See `docs/ui/emoji-map.md` for the full emoji set.  
+
+- **Upper Left Panel**: Event Log  
+  Displays the last 10 important events in chronological order (missile impacts, scout detections, battles, building completions, population deaths, etc.). New events push older ones down.  
+
+- **Lower Left Panel**: Chat  
+  Real-time chat between the two players. Messages appear instantly. No commands except “/surrender” which instantly ends the game in the opponent’s favor.  
+
+- **Right Sidebar**: Opponent Intel  
+  Shows only scouted information (buildings and approximate resource levels). Updates only when new scouting data arrives.  
+
+- **Main Area**: Six tabs (click to switch)  
+  1. Dashboard (overview numbers and big “End Year Early” test button)  
+  2. Economy (assign workers and build resource buildings)  
+  3. Buildings (list all structures with build buttons and progress)  
+  4. Military (train units and build defenses)  
+  5. Research (tech tree with progress bars)  
+  6. War Room (scout, launch missiles, commit ground assaults)
+
+**Buildings**  
+All buildings take 1–3 years to complete once started. Only one of each type can be built per category unless specified. Workers can be assigned to speed production.  
+
+**Resource Buildings** (Economy tab)  
+- Farm: +4 nutrition per year base. Cost: 15 lumber, 10 steel. Build time: 2 years. Capacity: 200 nutrition.  
+- Lumber Camp: +3 lumber per year base. Cost: 10 lumber, 5 steel. Build time: 1 year. Capacity: 150 lumber.  
+- Steel Mill: +2 steel per year base. Cost: 20 lumber, 10 steel. Build time: 2 years. Capacity: 100 steel.  
+- Alloy Quarry: +1 alloy per year base. Cost: 25 lumber, 15 steel. Build time: 2 years. Capacity: 80 alloy.  
+- Oil Rig: +2 oil per year base. Cost: 30 steel, 20 alloy. Build time: 3 years. Requires Electricity research. Capacity: 100 oil.  
+- Magnet Extractor: +1 magnet per year base. Cost: 40 steel, 15 alloy, 10 oil. Build time: 3 years. Requires Advanced Mining research. Capacity: 60 magnet.  
+- Power Plant: +3 electricity per year base. Cost: 25 steel, 15 oil. Build time: 2 years. Requires Electricity research. Consumes 1 oil per year. Capacity: 80 electricity.  
+- Glassworks: +2 glass per year base. Cost: 15 lumber, 10 steel. Build time: 2 years. Requires Industrial Furnaces research. Capacity: 120 glass.  
+- Plastics Plant: +2 plastic per year base. Cost: 10 steel, 15 oil, 5 electricity. Build time: 2 years. Requires Plastics research. Capacity: 120 plastic.  
+- Concrete Plant: +3 concrete per year base. Cost: 20 lumber, 10 steel, 5 electricity. Build time: 2 years. Requires Industrial Materials research. Capacity: 180 concrete.  
+- Silicon Refinery: +1 silicon per year base. Cost: 20 steel, 10 alloy, 5 electricity. Build time: 3 years. Requires Advanced Mining research. Capacity: 80 silicon.  
+
+**Support Buildings**  
+- House: +5 population capacity. Cost: 20 lumber, 10 steel. Build time: 1 year.  
+- Barracks: Enables soldier training. Cost: 30 lumber, 20 steel. Build time: 2 years.  
+- Factory: +20% production to all resource buildings when workers assigned. Cost: 40 steel, 25 alloy, 10 oil. Build time: 3 years. Requires Electricity research.  
+- Radar Station: Increases scout accuracy and duration. Cost: 20 steel, 15 alloy, 10 magnet. Build time: 2 years. Requires Advanced Scouting research.  
+- Dry Dock: Enables war ship training. Cost: 40 steel, 25 alloy, 15 oil. Build time: 3 years. Requires Naval Warfare research.
+- Airfield: Enables fighter zed training. Cost: 30 steel, 25 alloy, 10 silicon. Build time: 3 years. Requires Aerial Warfare research.
+
+**Military Buildings** (Military tab)  
+- Missile Silo: Enables missile launches. Cost: 35 steel, 20 oil, 15 alloy. Build time: 3 years. Requires Guided Missiles research. Capacity: 3 missiles stored.  
+- Anti-Missile Battery: 35% chance to intercept incoming missiles. Cost: 30 steel, 15 oil, 10 magnet. Build time: 2 years. Requires Guided Missiles research. One battery protects the entire base.  
+- Wall: Reduces ground assault damage by 40%. Cost: 50 lumber, 30 steel. Build time: 2 years.  
+
+**Units** (Military tab)  
+- Soldier: Cost: 8 nutrition, 4 steel. Upkeep: 0.5 nutrition per year. Attack power: 10.  
+- Tank: Cost: 12 steel, 8 oil. Upkeep: 1 nutrition + 0.5 oil per year. Attack power: 25. Requires Tanks research.  
+- War Ship: Cost: 30 steel, 20 oil, 15 alloy. Upkeep: 2 nutrition + 1 oil per year. Attack power: 50. Requires Naval Warfare research and Dry Dock.
+- Fighter Zed: Cost: 20 alloy, 15 oil, 10 silicon. Upkeep: 1.5 nutrition + 1 oil + 1 electricity per year. Attack power: 40. Requires Aerial Warfare research and Airfield.
+- Scout Drone: Cost: 5 oil, 3 electricity. Upkeep: 1 electricity per year. Reveals exact opponent buildings and resources for 2 years. Cooldown: 1 year.  
+
+**Research Tree** (Research tab)  
+Research is unlocked sequentially. Each level costs alloy and time.  
+
+Tier 1 (Year 3+ availability)  
+- Basic Tools: +20% production on all buildings. Cost: 15 alloy. Time: 2 years.  
+
+Tier 2  
+- Electricity: Unlocks Power Plants and Oil Rigs. Cost: 25 alloy, 5 magnet. Time: 3 years.  
+- Guided Missiles: Unlocks Missile Silos and Anti-Missile Batteries. Cost: 30 alloy, 10 magnet. Time: 3 years.  
+- Industrial Furnaces: Unlocks Glassworks. Cost: 20 alloy, 5 steel. Time: 2 years.  
+
+Tier 3  
+- Advanced Mining: Unlocks Magnet Extractors. Cost: 35 alloy, 15 magnet. Time: 3 years.  
+- Tanks: Unlocks tank training. Cost: 40 alloy, 20 magnet. Time: 4 years.  
+- Advanced Scouting: Improves scout drone accuracy. Cost: 25 alloy, 10 magnet. Time: 2 years.  
+- Plastics: Unlocks Plastics Plant. Cost: 30 alloy, 10 oil. Time: 3 years.  
+- Industrial Materials: Unlocks Concrete Plant. Cost: 20 alloy, 5 steel, 5 electricity. Time: 2 years.  
+- Naval Warfare: Unlocks war ship training. Cost: 50 alloy, 25 magnet. Time: 4 years.
+- Aerial Warfare: Unlocks fighter zed training. Cost: 50 alloy, 25 silicon. Time: 4 years.
+
+Tier 4 (End-game)  
+- Nuclear Technology: Unlocks Nuke in War Room. Cost: 100 alloy, 50 magnet, 30 electricity. Time: 5 years.  
+
+**War Room Mechanics**  
+**Scouting**  
+- Send Scout Drone: Reveals opponent’s exact number of every building and approximate resource totals (±10%) for the next 2 years.  
+- Opponent receives “Scout Detected” in their event log.  
+
+**Missile Strikes**  
+- Requires Missile Silo.  
+- Choose target: Economy buildings, Military buildings, or Population centers.  
+- Cost per missile: 8 steel, 6 oil, 3 electricity.  
+- Damage: 20–35% of targeted category (server calculates based on defender’s anti-missile batteries).  
+- Anti-Missile Battery has 35% intercept chance per battery.  
+
+**Ground Assaults**  
+- Select number of soldiers, tanks, war ships, and fighter zeds to commit.
+- Attacker strength = (soldiers × 10) + (tanks × 25) + (war_ships × 50) + (fighter_zeds × 40).
+- Defender strength = (remaining soldiers × 5) + (tanks × 12) + (war_ships × 25) + (fighter_zeds × 20) + (Wall bonus).
+- Winner loses 30% of committed forces; loser loses 70% of committed forces plus 1–2 random buildings.  
+- Attacker steals 10–20% of one random resource type if victorious.  
+
+All attacks launch instantly but resolve at the end of the current year tick.
+
+**Victory Conditions**  
+The game ends immediately when any of these occurs:  
+1. Opponent population reaches 0.  
+2. Nuclear strike lands and opponent has no active Anti-Missile Battery (instant win).  
+3. Opponent resources remain at 0 or negative for 5 consecutive years.  
+4. Opponent types “/surrender” in chat.  
+
+**Additional Rules**  
+- No random events occur.  
+- All calculations are deterministic except missile damage range (20–35%) and ground assault loot amount.  
+- Building capacity limits are strict; excess production is discarded.  
+- Resource and population numbers turn red or blink exactly as described when conditions are met.  
+- Chat and event log update in real time via WebSockets.  
+
+**Technical Notes for Implementation**  
+- Server uses Socket.io rooms keyed by the 4-digit code.  
+- All logic (ticks, combat, production) runs exclusively on the server.  
+- Client receives only state updates and renders text.  
+
+This document contains every rule, number, cost, and mechanic required to build and play the complete game.

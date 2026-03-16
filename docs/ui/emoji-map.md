@@ -34,6 +34,8 @@ Use this exact emoji set for UI consistency. If a platform lacks a glyph, fall b
 - Barracks: 🪖
 - Factory: 🏭
 - Radar Station: 📡
+- Dry Dock: ⚓
+- Airfield: 🛫
 
 ### Military Buildings
 - Missile Silo: 🚀
@@ -43,6 +45,8 @@ Use this exact emoji set for UI consistency. If a platform lacks a glyph, fall b
 ## Units
 - Soldier: 🪖
 - Tank: 🛞
+- War Ship: 🚢
+- Fighter Zed: 🛩️
 - Scout Drone: 🛰️
 
 ## Research

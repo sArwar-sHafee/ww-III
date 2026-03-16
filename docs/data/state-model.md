@@ -30,11 +30,14 @@ This is a minimal, explicit server state. You may extend it but do not remove fi
 Use stable string IDs. Example set:
 - `farm`, `lumber_camp`, `steel_mill`, `alloy_quarry`, `oil_rig`, `magnet_extractor`, `power_plant`
 - `glassworks`, `plastics_plant`, `concrete_plant`, `silicon_refinery`
-- `house`, `barracks`, `factory`, `radar_station`
+- `house`, `barracks`, `factory`, `radar_station`, `dry_dock`, `airfield`
 - `missile_silo`, `anti_missile_battery`, `wall`
 
 ## Unit IDs
-`soldier`, `tank`, `scout_drone`
+`soldier`, `tank`, `war_ship`, `fighter_zed`, `scout_drone`
+
+## Research IDs
+`basic_tools`, `electricity`, `guided_missiles`, `industrial_furnaces`, `advanced_mining`, `tanks`, `advanced_scouting`, `plastics`, `industrial_materials`, `naval_warfare`, `aerial_warfare`, `nuclear_technology`
 
 ## Notes
 - All numeric values are integers unless explicitly defined as fractional during calculation, then floored.
