@@ -1,0 +1,11 @@
+{
+  "name": "ww-iii",
+  "version": "1.0.0",
+  "description": "Text-based real-time 2-player strategy game",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  }
+}
