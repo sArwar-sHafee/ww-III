@@ -17,13 +17,24 @@ const roomInputEl = document.getElementById('roomInput');
 
 async function api(path, body) {
   const res = await fetch(path, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || 'Request failed');
-  return json;
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Request failed');
+    return json;
+  }
+
+  const text = (await res.text()).trim();
+  const snippet = text.slice(0, 160) || 'empty response';
+  throw new Error(`Unexpected server response (${res.status}) for ${path}: ${snippet}`);
+}
+
+async function ensureMeta() {
+  if (!state.meta) state.meta = await api('/api/meta');
 }
 
 function renderTopBar() {
-  if (!state.game) return;
+  if (!state.game || !state.meta) return;
   const you = state.game.you;
   const items = [`Year ${state.game.year}`, `Population ${you.population}/${you.populationMax}`];
   for (const r of state.meta.resources) {
