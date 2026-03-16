@@ -150,14 +150,31 @@ function renderAll() {
   }
 }
 
+function applyGameState(game) {
+  state.game = game;
+  state.lastStateAt = Date.now();
+  if (!state.game?.opponent?.name) {
+    roomInfoEl.textContent = `Room ${state.roomId}. Share this 4-digit code with your opponent.`;
+  }
+  renderAll();
+}
+
+function startPollingFallback() {
+  clearInterval(state.pollTimer);
+  state.pollTimer = setInterval(async () => {
+    if (!state.roomId || !state.playerId) return;
+    if (Date.now() - state.lastStateAt < 4_000) return;
+    try {
+      const game = await api(`/api/state?roomId=${state.roomId}&playerId=${state.playerId}`);
+      applyGameState(game);
+    } catch (_) {}
+  }, 2_000);
+}
+
 async function connectStream() {
   const es = new EventSource(`${API_ORIGIN}/api/stream?roomId=${state.roomId}&playerId=${state.playerId}`);
   es.addEventListener('state', (evt) => {
-    state.game = JSON.parse(evt.data);
-    if (!state.game?.opponent?.name) {
-      roomInfoEl.textContent = `Room ${state.roomId}. Share this 4-digit code with your opponent.`;
-    }
-    renderAll();
+    applyGameState(JSON.parse(evt.data));
   });
 }
 
