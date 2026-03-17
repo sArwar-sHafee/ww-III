@@ -42,15 +42,17 @@ function renderTopBar() {
   for (const r of state.meta.resources) {
     const value = you.resources[r];
     const net = you.net?.[r] ?? 0;
-    const cls = value <= 0 || net < 0 ? 'red' : '';
-    items.push(`<span class="${cls} ${value<=0?'blink':''}">${emojis[r]} ${r}: ${value} (${net >=0?'+':''}${net})</span>`);
+    let cls = '';
+    if (net < 0) cls = 'yellow';
+    else if (value <= 0) cls = 'red';
+    items.push(`<span class="${cls}">${emojis[r]} ${r}: ${value} (${net >=0?'+':''}${net})</span>`);
   }
   const secLeft = Math.max(0, Math.floor((state.game.tickEndsAt - Date.now()) / 1000));
   topBar.innerHTML = `${items.join(' | ')} | Tick: ${secLeft}s`;
 }
 
 function renderEvents() {
-  eventsEl.innerHTML = (state.game?.you.eventLog || []).map((e) => `<li>[Y${e.year}] ${e.message}</li>`).join('');
+  eventsEl.innerHTML = (state.game?.you.eventLog || []).map((e) => `<li class="${e.type || ''}">[Y${e.year}] ${e.message}</li>`).join('');
 }
 
 function renderChat() {
@@ -70,10 +72,10 @@ function costLine(cost) {
   return Object.entries(cost).map(([k, v]) => `${emojis[k] || ''}${k}:${v}`).join(', ');
 }
 
-function actionBtn(label, cb) {
+function actionBtn(label, cb, disabled = false) {
   const id = `btn_${Math.random().toString(36).slice(2)}`;
-  setTimeout(() => document.getElementById(id)?.addEventListener('click', cb));
-  return `<button id="${id}">${label}</button>`;
+  if (!disabled) setTimeout(() => document.getElementById(id)?.addEventListener('click', cb));
+  return `<button id="${id}" ${disabled ? 'disabled' : ''}>${label}</button>`;
 }
 
 function renderTab() {
@@ -90,7 +92,9 @@ function renderTab() {
     const ids = Object.keys(state.meta.buildings).filter((k) => state.tab === 'economy' ? state.meta.buildings[k].category === 'economy' : true);
     tabContent.innerHTML = `<h3>${state.tab === 'economy' ? 'Economy' : 'Buildings'}</h3><div class='action-grid'>` + ids.map((id) => {
       const b = state.meta.buildings[id];
-      return `<div class='card'><b>${b.name}</b><div class='small'>Owned: ${you.buildings[id]} | Build time: ${b.buildTime}</div><div class='small'>Cost: ${costLine(b.cost)}</div>${actionBtn('Build', () => sendAction('build', { id }))}</div>`;
+      const inQueue = you.buildingQueues.find((q) => q.id === id);
+      const label = inQueue ? `Building... (${inQueue.yearsRemaining}y)` : 'Build';
+      return `<div class='card'><b>${b.name}</b><div class='small'>Owned: ${you.buildings[id]} | Build time: ${b.buildTime}</div><div class='small'>Cost: ${costLine(b.cost)}</div>${actionBtn(label, () => sendAction('build', { id }), !!inQueue)}</div>`;
     }).join('') + '</div>';
     return;
   }
@@ -108,8 +112,13 @@ function renderTab() {
   }
 
   if (state.tab === 'research') {
-    tabContent.innerHTML = `<h3>Research</h3><div class='small'>Active: ${you.research.active ? `${state.meta.research[you.research.active.id].name} (${you.research.active.yearsRemaining}y)` : 'None'}</div><div class='action-grid'>` +
-      Object.entries(state.meta.research).map(([id, r]) => `<div class='card'><b>${r.name}</b><div class='small'>Cost: ${costLine(r.cost)} | ${r.years}y</div><div class='small'>Completed: ${you.research.completed.includes(id) ? 'Yes' : 'No'}</div>${actionBtn('Start', () => sendAction('research', { id }))}</div>`).join('') + '</div>';
+    const active = you.research.active;
+    tabContent.innerHTML = `<h3>Research</h3><div class='small'>Active: ${active ? `${state.meta.research[active.id].name} (${active.yearsRemaining}y)` : 'None'}</div><div class='action-grid'>` +
+      Object.entries(state.meta.research).map(([id, r]) => {
+        const isCurrent = active?.id === id;
+        const label = isCurrent ? `Researching... (${active.yearsRemaining}y)` : 'Start';
+        return `<div class='card'><b>${r.name}</b><div class='small'>Cost: ${costLine(r.cost)} | ${r.years}y</div><div class='small'>Completed: ${you.research.completed.includes(id) ? 'Yes' : 'No'}</div>${actionBtn(label, () => sendAction('research', { id }), !!isCurrent || you.research.completed.includes(id))}</div>`;
+      }).join('') + '</div>';
     return;
   }
 
@@ -126,7 +135,7 @@ async function sendAction(type, payload) {
   try {
     await api('/api/action', { roomId: state.roomId, playerId: state.playerId, type, payload });
   } catch (e) {
-    alert(e.message);
+    // Errors are now logged to the Event Log via server-side appendEvent
   }
 }
 

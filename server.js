@@ -10,7 +10,7 @@ const publicDir = path.join(__dirname, 'public');
 const SSE_HEARTBEAT_MS = 15_000;
 
 const YEAR_MS = 30_000;
-const STARTING_RESOURCES = { nutrition: 50, lumber: 30, steel: 20, alloy: 10, oil: 0, magnet: 0, electricity: 0, glass: 0, plastic: 0, concrete: 0, silicon: 0 };
+const STARTING_RESOURCES = { nutrition: 200, lumber: 150, steel: 100, alloy: 50, oil: 20, magnet: 20, electricity: 20, glass: 20, plastic: 20, concrete: 20, silicon: 20 };
 const RESOURCE_KEYS = Object.keys(STARTING_RESOURCES);
 
 const BUILDINGS = {
@@ -82,8 +82,8 @@ function createPlayer(playerId, name) {
   };
 }
 
-function appendEvent(player, year, message) {
-  player.eventLog.unshift({ year, message });
+function appendEvent(player, year, message, type = 'info') {
+  player.eventLog.unshift({ year, message, type });
   player.eventLog = player.eventLog.slice(0, 10);
 }
 
@@ -427,19 +427,39 @@ const server = http.createServer(async (req, res) => {
       if (type === 'build') {
         const cfg = BUILDINGS[payload.id];
         if (!cfg) return writeJson(res, 400, { error: 'Invalid building' });
-        if (cfg.requires && !cfg.requires.every((x) => p.research.completed.includes(x))) return writeJson(res, 400, { error: 'Research missing' });
-        if (!canAfford(p.resources, cfg.cost)) return writeJson(res, 400, { error: 'Insufficient resources' });
+        if (cfg.requires && !cfg.requires.every((x) => p.research.completed.includes(x))) {
+          appendEvent(p, room.year, `❌ Build failed: Research missing for ${cfg.name}`, 'error');
+          broadcastRoom(room);
+          return writeJson(res, 400, { error: 'Research missing' });
+        }
+        if (!canAfford(p.resources, cfg.cost)) {
+          appendEvent(p, room.year, `❌ Build failed: Insufficient resources for ${cfg.name}`, 'error');
+          broadcastRoom(room);
+          return writeJson(res, 400, { error: 'Insufficient resources' });
+        }
         payCost(p.resources, cfg.cost);
         p.buildingQueues.push({ id: payload.id, yearsRemaining: cfg.buildTime });
         appendEvent(p, room.year, `🏗️ Started ${cfg.name}`);
       } else if (type === 'train') {
         const unit = UNITS[payload.id];
         if (!unit) return writeJson(res, 400, { error: 'Invalid unit' });
-        if (unit.requiresBuilding && p.buildings[unit.requiresBuilding] <= 0) return writeJson(res, 400, { error: 'Required building missing' });
-        if (unit.requiresTech && !p.research.completed.includes(unit.requiresTech)) return writeJson(res, 400, { error: 'Research missing' });
+        if (unit.requiresBuilding && p.buildings[unit.requiresBuilding] <= 0) {
+          appendEvent(p, room.year, `❌ Training failed: Required building missing for ${unit.name}`, 'error');
+          broadcastRoom(room);
+          return writeJson(res, 400, { error: 'Required building missing' });
+        }
+        if (unit.requiresTech && !p.research.completed.includes(unit.requiresTech)) {
+          appendEvent(p, room.year, `❌ Training failed: Research missing for ${unit.name}`, 'error');
+          broadcastRoom(room);
+          return writeJson(res, 400, { error: 'Research missing' });
+        }
         const amount = Math.max(1, Number(payload.amount || 1));
         const totalCost = Object.fromEntries(Object.entries(unit.cost).map(([k, v]) => [k, v * amount]));
-        if (!canAfford(p.resources, totalCost)) return writeJson(res, 400, { error: 'Insufficient resources' });
+        if (!canAfford(p.resources, totalCost)) {
+          appendEvent(p, room.year, `❌ Training failed: Insufficient resources for ${amount} ${unit.name}`, 'error');
+          broadcastRoom(room);
+          return writeJson(res, 400, { error: 'Insufficient resources' });
+        }
         payCost(p.resources, totalCost);
         p.units[payload.id] += amount;
         appendEvent(p, room.year, `🪖 Trained ${amount} ${unit.name}`);
@@ -449,8 +469,16 @@ const server = http.createServer(async (req, res) => {
         if (p.research.active) return writeJson(res, 400, { error: 'Research in progress' });
         if (p.research.completed.includes(payload.id)) return writeJson(res, 400, { error: 'Already researched' });
         if (tech.minYear && room.year < tech.minYear) return writeJson(res, 400, { error: 'Not available yet' });
-        if (tech.prereq && !p.research.completed.includes(tech.prereq)) return writeJson(res, 400, { error: 'Prerequisite missing' });
-        if (!canAfford(p.resources, tech.cost)) return writeJson(res, 400, { error: 'Insufficient resources' });
+        if (tech.prereq && !p.research.completed.includes(tech.prereq)) {
+          appendEvent(p, room.year, `❌ Research failed: Prerequisite missing for ${tech.name}`, 'error');
+          broadcastRoom(room);
+          return writeJson(res, 400, { error: 'Prerequisite missing' });
+        }
+        if (!canAfford(p.resources, tech.cost)) {
+          appendEvent(p, room.year, `❌ Research failed: Insufficient resources for ${tech.name}`, 'error');
+          broadcastRoom(room);
+          return writeJson(res, 400, { error: 'Insufficient resources' });
+        }
         payCost(p.resources, tech.cost);
         p.research.active = { id: payload.id, yearsRemaining: tech.years };
         appendEvent(p, room.year, `🧠 Started research: ${tech.name}`);
