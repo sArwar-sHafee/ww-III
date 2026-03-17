@@ -1,9 +1,15 @@
-const state = { roomId: null, playerId: null, meta: null, game: null, tab: 'dashboard' };
+const state = { roomId: null, playerId: null, meta: null, game: null, tab: 'dashboard', lastStateAt: 0, pollTimer: null };
 const DEFAULT_API_ORIGIN = 'https://ww-iii.onrender.com';
 const API_ORIGIN = window.WWIII_API_ORIGIN || (window.location.hostname.endsWith('.vercel.app') ? DEFAULT_API_ORIGIN : '');
 const emojis = {
+  // Resources
   nutrition: '🍲', lumber: '🪵', steel: '🔩', alloy: '🪙', oil: '🛢️', magnet: '🧲', electricity: '⚡', glass: '🪟', plastic: '♻️', concrete: '🧱', silicon: '💾',
-  shipyard: '⚓', airfield: '🛫', war_ship: '🚢', fighter_zed: '✈️', soldier: '🪖', tank: '🛞', scout_drone: '🛰️'
+  // Buildings
+  farm: '🌾', lumber_camp: '🪓', steel_mill: '🏭', alloy_quarry: '⛏️', oil_rig: '🛢️', magnet_extractor: '🧲', power_plant: '⚡', glassworks: '🪟', plastics_plant: '🧪', concrete_plant: '🧱', silicon_refinery: '💾',
+  house: '🏠', barracks: '🪖', factory: '🏭', radar_station: '📡', dry_dock: '⚓', airfield: '🛫',
+  missile_silo: '🚀', anti_missile_battery: '🛡️', wall: '🧱',
+  // Units
+  soldier: '🪖', tank: '🛞', war_ship: '🚢', fighter_zed: '🛩️', scout_drone: '🛰️'
 };
 const tabs = ['dashboard', 'economy', 'buildings', 'military', 'research', 'war_room'];
 
@@ -38,17 +44,20 @@ async function ensureMeta() {
 function renderTopBar() {
   if (!state.game || !state.meta) return;
   const you = state.game.you;
-  const items = [`Year ${state.game.year}, Month ${state.game.month}`, `Population ${you.population}/${you.populationMax}`];
+  const items = [
+    `<span>📅 Year ${state.game.year}, Month ${state.game.month}</span>`,
+    `<span>👥 Pop: ${you.population}/${you.populationMax}</span>`
+  ];
   for (const r of state.meta.resources) {
     const value = Math.floor(you.resources[r]);
     const net = you.net?.[r] ?? 0;
     let cls = '';
-    if (net < 0) cls = 'yellow';
-    else if (value <= 0) cls = 'red';
-    items.push(`<span class="${cls}">${emojis[r]} ${r}: ${value} (${net >=0?'+':''}${Math.floor(net)})</span>`);
+    if (value <= 0) cls = 'red';
+    else if (net < 0) cls = 'yellow';
+    items.push(`<span class="${cls}">${emojis[r]} ${r}: <b>${value}</b> <small>(${net >= 0 ? '+' : ''}${Math.floor(net)})</small></span>`);
   }
   const secLeft = Math.max(0, Math.floor((state.game.tickEndsAt - Date.now()) / 1000));
-  topBar.innerHTML = `${items.join(' | ')} | Tick: ${secLeft}s`;
+  topBar.innerHTML = items.join('') + `<span>⏱️ ${secLeft}s</span>`;
 }
 
 function renderEvents() {
@@ -93,20 +102,38 @@ function renderTab() {
       const b = state.meta.buildings[id];
       const inQueue = you.buildingQueues.find((q) => q.id === id);
       const label = inQueue ? `Building... (${Math.ceil(inQueue.ticksRemaining / 5)}m)` : 'Build';
-      return `<div class='card'><b>${b.name}</b><div class='small'>Owned: ${you.buildings[id]} | Build time: ${b.buildTime * 12}m</div><div class='small'>Cost: ${costLine(b.cost)}</div>${actionBtn(label, () => sendAction('build', { id }), !!inQueue)}</div>`;
+      return `<div class='card'><b>${emojis[id] || ''} ${b.name}</b><div class='small'>Owned: ${you.buildings[id]} | Build time: ${b.buildTime * 12}m</div><div class='small'>Cost: ${costLine(b.cost)}</div>${actionBtn(label, () => sendAction('build', { id }), !!inQueue)}</div>`;
     }).join('') + '</div>';
     return;
   }
 
   if (state.tab === 'military') {
-    tabContent.innerHTML = `<h3>Military</h3><div class='action-grid'>` + Object.entries(state.meta.units).map(([id, u]) =>
-      `<div class='card'><b>${emojis[id] || ''} ${u.name}</b><div class='small'>Owned: ${you.units[id]}</div><div class='small'>Cost: ${costLine(u.cost)}</div><div class='row'><input id='amt_${id}' value='1' type='number' min='1'/>${actionBtn('Train', () => sendAction('train', { id, amount: Number(document.getElementById(`amt_${id}`).value || 1) }))}</div></div>`
-    ).join('') + `</div>
-      <h4>War Room Quick Actions</h4>
+    const unitIds = Object.keys(state.meta.units);
+    const defenseIds = ['missile_silo', 'anti_missile_battery', 'wall'];
+
+    let html = '<h3>Military Units</h3><div class="action-grid">';
+    html += unitIds.map((id) => {
+      const u = state.meta.units[id];
+      return `<div class='card'><b>${emojis[id] || ''} ${u.name}</b><div class='small'>Owned: ${you.units[id]}</div><div class='small'>Cost: ${costLine(u.cost)}</div><div class='row'><input id='amt_${id}' value='1' type='number' min='1'/>${actionBtn('Train', () => sendAction('train', { id, amount: Number(document.getElementById(`amt_${id}`).value || 1) }))}</div></div>`;
+    }).join('');
+    html += '</div>';
+
+    html += '<h3>Defenses</h3><div class="action-grid">';
+    html += defenseIds.map((id) => {
+      const b = state.meta.buildings[id];
+      const inQueue = you.buildingQueues.find((q) => q.id === id);
+      const label = inQueue ? `Building... (${Math.ceil(inQueue.ticksRemaining / 5)}m)` : 'Build';
+      return `<div class='card'><b>${emojis[id] || ''} ${b.name}</b><div class='small'>Owned: ${you.buildings[id]} | Build time: ${b.buildTime * 12}m</div><div class='small'>Cost: ${costLine(b.cost)}</div>${actionBtn(label, () => sendAction('build', { id }), !!inQueue)}</div>`;
+    }).join('');
+    html += '</div>';
+
+    html += `<h4>War Room Quick Actions</h4>
       <div class='row'>${actionBtn('Queue Scout', () => sendAction('scout', {}))}
       <select id='missileTarget'><option value='economy'>Economy</option><option value='military'>Military</option><option value='support'>Population Centers</option></select>
       ${actionBtn('Queue Missile', () => sendAction('missile', { target: document.getElementById('missileTarget').value }))}</div>
-      <div class='row' title='Commit: Soldier, Tank, War Ship, Fighter Zed'>🪖<input id='ass_soldier' style='width:50px' type='number' value='5' min='0'/> 🛞<input id='ass_tank' style='width:50px' type='number' value='0' min='0'/> 🚢<input id='ass_war_ship' style='width:50px' type='number' value='0' min='0'/> ✈️<input id='ass_fighter_zed' style='width:50px' type='number' value='0' min='0'/>${actionBtn('Queue Assault', () => sendAction('assault', { soldier: Number(document.getElementById('ass_soldier').value), tank: Number(document.getElementById('ass_tank').value), war_ship: Number(document.getElementById('ass_war_ship').value), fighter_zed: Number(document.getElementById('ass_fighter_zed').value) }))}</div>`;
+      <div class='row' title='Commit: Soldier, Tank, War Ship, Fighter Zed'>🪖<input id='ass_soldier' style='width:50px' type='number' value='5' min='0'/> 🛞<input id='ass_tank' style='width:50px' type='number' value='0' min='0'/> 🚢<input id='ass_war_ship' style='width:50px' type='number' value='0' min='0'/> 🛩️<input id='ass_fighter_zed' style='width:50px' type='number' value='0' min='0'/>${actionBtn('Queue Assault', () => sendAction('assault', { soldier: Number(document.getElementById('ass_soldier').value), tank: Number(document.getElementById('ass_tank').value), war_ship: Number(document.getElementById('ass_war_ship').value), fighter_zed: Number(document.getElementById('ass_fighter_zed').value) }))}</div>`;
+
+    tabContent.innerHTML = html;
     return;
   }
 
@@ -126,7 +153,7 @@ function renderTab() {
     <p>Queue actions now. All resolve at end of year.</p>
     <div class='row'>${actionBtn('Launch Scout', () => sendAction('scout', {}))}</div>
     <div class='row'><select id='wrTarget'><option value='economy'>Economy</option><option value='military'>Military</option><option value='support'>Population Centers</option></select>${actionBtn('Launch Missile', () => sendAction('missile', { target: document.getElementById('wrTarget').value }))}</div>
-    <div class='row' title='Commit: Soldier, Tank, War Ship, Fighter Zed'>🪖<input id='wr_soldier' style='width:50px' type='number' value='10' min='0'/> 🛞<input id='wr_tank' style='width:50px' type='number' value='1' min='0'/> 🚢<input id='wr_war_ship' style='width:50px' type='number' value='0' min='0'/> ✈️<input id='wr_fighter_zed' style='width:50px' type='number' value='0' min='0'/>${actionBtn('Commit Assault', () => sendAction('assault', { soldier: Number(document.getElementById('wr_soldier').value), tank: Number(document.getElementById('wr_tank').value), war_ship: Number(document.getElementById('wr_war_ship').value), fighter_zed: Number(document.getElementById('wr_fighter_zed').value) }))}</div>`;
+    <div class='row' title='Commit: Soldier, Tank, War Ship, Fighter Zed'>🪖<input id='wr_soldier' style='width:50px' type='number' value='10' min='0'/> 🛞<input id='wr_tank' style='width:50px' type='number' value='1' min='0'/> 🚢<input id='wr_war_ship' style='width:50px' type='number' value='0' min='0'/> 🛩️<input id='wr_fighter_zed' style='width:50px' type='number' value='0' min='0'/>${actionBtn('Commit Assault', () => sendAction('assault', { soldier: Number(document.getElementById('wr_soldier').value), tank: Number(document.getElementById('wr_tank').value), war_ship: Number(document.getElementById('wr_war_ship').value), fighter_zed: Number(document.getElementById('wr_fighter_zed').value) }))}</div>`;
   }
 }
 
