@@ -11,9 +11,11 @@ header { display: grid; gap: 8px; }
 .tab.active { border-color: #70c1ff; }
 .hidden { display: none !important; }
 .red { color: #ff7373; }
+.yellow { color: #ffff73; }
 .blink { animation: blinker .9s step-start infinite; }
 @keyframes blinker { 50% { opacity: .3; } }
 #events { padding-left: 16px; max-height: 300px; overflow: auto; }
+#events li.error { color: #ff7373; }
 #chat { max-height: 210px; overflow: auto; font-size: 13px; margin-bottom: 6px; }
 pre { white-space: pre-wrap; word-break: break-word; }
 .row { display: flex; gap: 6px; margin-top: 6px; }

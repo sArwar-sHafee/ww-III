@@ -3,7 +3,7 @@ const DEFAULT_API_ORIGIN = 'https://ww-iii.onrender.com';
 const API_ORIGIN = window.WWIII_API_ORIGIN || (window.location.hostname.endsWith('.vercel.app') ? DEFAULT_API_ORIGIN : '');
 const emojis = {
   nutrition: '🍲', lumber: '🪵', steel: '🔩', alloy: '🪙', oil: '🛢️', magnet: '🧲', electricity: '⚡', glass: '🪟', plastic: '♻️', concrete: '🧱', silicon: '💾',
-  shipyard: '⚓', airfield: '🛫', war_ship: '🚢', fighter_zed: '✈️'
+  shipyard: '⚓', airfield: '🛫', war_ship: '🚢', fighter_zed: '✈️', soldier: '🪖', tank: '🛞', scout_drone: '🛰️'
 };
 const tabs = ['dashboard', 'economy', 'buildings', 'military', 'research', 'war_room'];
 
@@ -38,14 +38,14 @@ async function ensureMeta() {
 function renderTopBar() {
   if (!state.game || !state.meta) return;
   const you = state.game.you;
-  const items = [`Year ${state.game.year}`, `Population ${you.population}/${you.populationMax}`];
+  const items = [`Year ${state.game.year}, Month ${state.game.month}`, `Population ${you.population}/${you.populationMax}`];
   for (const r of state.meta.resources) {
-    const value = you.resources[r];
+    const value = Math.floor(you.resources[r]);
     const net = you.net?.[r] ?? 0;
     let cls = '';
     if (net < 0) cls = 'yellow';
     else if (value <= 0) cls = 'red';
-    items.push(`<span class="${cls}">${emojis[r]} ${r}: ${value} (${net >=0?'+':''}${net})</span>`);
+    items.push(`<span class="${cls}">${emojis[r]} ${r}: ${value} (${net >=0?'+':''}${Math.floor(net)})</span>`);
   }
   const secLeft = Math.max(0, Math.floor((state.game.tickEndsAt - Date.now()) / 1000));
   topBar.innerHTML = `${items.join(' | ')} | Tick: ${secLeft}s`;
@@ -83,8 +83,7 @@ function renderTab() {
   if (!you) return;
   if (state.tab === 'dashboard') {
     tabContent.innerHTML = `<h3>Dashboard</h3>
-      <p>Room: <b>${state.game.roomId}</b> | You: ${you.name} | Opponent: ${state.game.opponent?.name || 'Waiting...'}</p>
-      ${actionBtn('End Year Early (debug)', () => alert('Tick is server-timed every 30s by design.'))}`;
+      <p>Room: <b>${state.game.roomId}</b> | You: ${you.name} | Opponent: ${state.game.opponent?.name || 'Waiting...'}</p>`;
     return;
   }
 
@@ -93,8 +92,8 @@ function renderTab() {
     tabContent.innerHTML = `<h3>${state.tab === 'economy' ? 'Economy' : 'Buildings'}</h3><div class='action-grid'>` + ids.map((id) => {
       const b = state.meta.buildings[id];
       const inQueue = you.buildingQueues.find((q) => q.id === id);
-      const label = inQueue ? `Building... (${inQueue.yearsRemaining}y)` : 'Build';
-      return `<div class='card'><b>${b.name}</b><div class='small'>Owned: ${you.buildings[id]} | Build time: ${b.buildTime}</div><div class='small'>Cost: ${costLine(b.cost)}</div>${actionBtn(label, () => sendAction('build', { id }), !!inQueue)}</div>`;
+      const label = inQueue ? `Building... (${Math.ceil(inQueue.ticksRemaining / 5)}m)` : 'Build';
+      return `<div class='card'><b>${b.name}</b><div class='small'>Owned: ${you.buildings[id]} | Build time: ${b.buildTime * 12}m</div><div class='small'>Cost: ${costLine(b.cost)}</div>${actionBtn(label, () => sendAction('build', { id }), !!inQueue)}</div>`;
     }).join('') + '</div>';
     return;
   }
@@ -113,11 +112,11 @@ function renderTab() {
 
   if (state.tab === 'research') {
     const active = you.research.active;
-    tabContent.innerHTML = `<h3>Research</h3><div class='small'>Active: ${active ? `${state.meta.research[active.id].name} (${active.yearsRemaining}y)` : 'None'}</div><div class='action-grid'>` +
+    tabContent.innerHTML = `<h3>Research</h3><div class='small'>Active: ${active ? `${state.meta.research[active.id].name} (${Math.ceil(active.ticksRemaining / 5)}m)` : 'None'}</div><div class='action-grid'>` +
       Object.entries(state.meta.research).map(([id, r]) => {
         const isCurrent = active?.id === id;
-        const label = isCurrent ? `Researching... (${active.yearsRemaining}y)` : 'Start';
-        return `<div class='card'><b>${r.name}</b><div class='small'>Cost: ${costLine(r.cost)} | ${r.years}y</div><div class='small'>Completed: ${you.research.completed.includes(id) ? 'Yes' : 'No'}</div>${actionBtn(label, () => sendAction('research', { id }), !!isCurrent || you.research.completed.includes(id))}</div>`;
+        const label = isCurrent ? `Researching... (${Math.ceil(active.ticksRemaining / 5)}m)` : 'Start';
+        return `<div class='card'><b>${r.name}</b><div class='small'>Cost: ${costLine(r.cost)} | ${r.years * 12}m</div><div class='small'>Completed: ${you.research.completed.includes(id) ? 'Yes' : 'No'}</div>${actionBtn(label, () => sendAction('research', { id }), !!isCurrent || you.research.completed.includes(id))}</div>`;
       }).join('') + '</div>';
     return;
   }
