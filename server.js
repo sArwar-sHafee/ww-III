@@ -34,15 +34,15 @@ const BUILDINGS = {
   missile_silo: { name: 'Missile Silo', cost: { steel: 35, oil: 20, alloy: 15 }, buildTime: 3, requires: ['guided_missiles'], category: 'military' },
   anti_missile_battery: { name: 'Anti-Missile Battery', cost: { steel: 30, oil: 15, magnet: 10 }, buildTime: 2, requires: ['guided_missiles'], category: 'military' },
   wall: { name: 'Wall', cost: { lumber: 50, steel: 30 }, buildTime: 2, category: 'military' },
-  shipyard: { name: 'Shipyard', cost: { lumber: 50, steel: 40, concrete: 20 }, buildTime: 3, category: 'support' },
+  dry_dock: { name: 'Dry Dock', cost: { lumber: 50, steel: 40, concrete: 20 }, buildTime: 3, category: 'support' },
   airfield: { name: 'Airfield', cost: { steel: 60, alloy: 30, concrete: 40 }, buildTime: 3, category: 'support' }
 };
 
 const UNITS = {
   soldier: { name: 'Soldier', cost: { nutrition: 8, steel: 4 }, upkeep: { nutrition: 0.5 }, attack: 10, requiresBuilding: 'barracks' },
   tank: { name: 'Tank', cost: { steel: 12, oil: 8 }, upkeep: { nutrition: 1, oil: 0.5 }, attack: 25, requiresTech: 'tanks', requiresBuilding: 'barracks' },
-  war_ship: { name: 'War Ship', cost: { steel: 50, alloy: 30, oil: 20 }, upkeep: { nutrition: 2, oil: 1 }, attack: 100, requiresTech: 'naval_warfare', requiresBuilding: 'shipyard' },
-  fighter_zed: { name: 'Fighter Zed', cost: { alloy: 40, oil: 20, silicon: 10 }, upkeep: { nutrition: 1, oil: 2 }, attack: 150, requiresTech: 'air_superiority', requiresBuilding: 'airfield' },
+  war_ship: { name: 'War Ship', cost: { steel: 50, alloy: 30, oil: 20 }, upkeep: { nutrition: 2, oil: 1 }, attack: 100, requiresTech: 'naval_warfare', requiresBuilding: 'dry_dock' },
+  fighter_zed: { name: 'Fighter Zed', cost: { alloy: 40, oil: 20, silicon: 10 }, upkeep: { nutrition: 1, oil: 2 }, attack: 150, requiresTech: 'aerial_warfare', requiresBuilding: 'airfield' },
   scout_drone: { name: 'Scout Drone', cost: { oil: 5, electricity: 3 }, upkeep: { electricity: 1 }, requiresBuilding: 'radar_station' }
 };
 
@@ -54,7 +54,7 @@ const RESEARCH = {
   advanced_mining: { name: 'Advanced Mining', cost: { alloy: 35, magnet: 15 }, years: 3, prereq: 'electricity' },
   tanks: { name: 'Tanks', cost: { alloy: 40, magnet: 20 }, years: 4, prereq: 'guided_missiles' },
   naval_warfare: { name: 'Naval Warfare', cost: { alloy: 40, magnet: 20 }, years: 4, prereq: 'basic_tools' },
-  air_superiority: { name: 'Air Superiority', cost: { alloy: 50, silicon: 20 }, years: 4, prereq: 'electricity' },
+  aerial_warfare: { name: 'Aerial Warfare', cost: { alloy: 50, silicon: 20 }, years: 4, prereq: 'electricity' },
   advanced_scouting: { name: 'Advanced Scouting', cost: { alloy: 25, magnet: 10 }, years: 2, prereq: 'industrial_furnaces' },
   plastics: { name: 'Plastics', cost: { alloy: 30, oil: 10 }, years: 3, prereq: 'electricity' },
   industrial_materials: { name: 'Industrial Materials', cost: { alloy: 20, steel: 5, electricity: 5 }, years: 2, prereq: 'industrial_furnaces' },
@@ -205,8 +205,8 @@ function resolveTick(room) {
           const tanks = Math.min(action.tank || 0, p.units.tank);
           const ships = Math.min(action.war_ship || 0, p.units.war_ship);
           const planes = Math.min(action.fighter_zed || 0, p.units.fighter_zed);
-          const atk = soldiers * 10 + tanks * 25 + ships * 100 + planes * 150;
-          const def = opponent.units.soldier * 5 + opponent.units.tank * 12 + opponent.units.war_ship * 50 + opponent.units.fighter_zed * 75 + (opponent.buildings.wall > 0 ? 100 : 0);
+          const atk = soldiers * 10 + tanks * 25 + ships * 50 + planes * 40;
+          const def = opponent.units.soldier * 5 + opponent.units.tank * 12 + opponent.units.war_ship * 25 + opponent.units.fighter_zed * 20 + (opponent.buildings.wall > 0 ? 100 : 0);
           if (atk > 0) {
             const attackerWon = atk > def;
             const atkLoss = attackerWon ? 0.3 : 0.7;
@@ -557,6 +557,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+// Main Game Loop
 setInterval(() => {
   for (const room of rooms.values()) {
     if (Date.now() >= room.tickEndsAt && room.playerOrder.length === 2) resolveTick(room);
