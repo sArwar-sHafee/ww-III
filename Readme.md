@@ -85,15 +85,14 @@ Resources are displayed in the top bar with current total and net change for the
 - **Lower Right Panel**: Opponent Intel  
   Shows only scouted information (buildings and approximate resource levels). Updates only when new scouting data arrives, and sits directly below chat without a large empty gap.  
 
-- **Main Area**: Eight tabs (click to switch)  
-  1. Dashboard (overview numbers and surrender button)  
+- **Main Area**: Seven tabs (click to switch)  
+  1. Dashboard (overview numbers, surrender button, queued actions, and summary tables)  
   2. Economy (resource buildings only)  
   3. Buildings (support buildings only)  
-  4. Table View (resources, buildings, and units in compact tables)  
-  5. Military (train military units only)  
-  6. Defences (build defensive structures only)  
-  7. Research (tech tree with progress bars)  
-  8. War Room (queued actions, scout, launch missiles, commit ground assaults)
+  4. Military (train military units only)  
+  5. Defences (build defensive structures only)  
+  6. Research (tech tree with progress bars)  
+  7. War Room (queued actions, scout, launch missiles, commit ground assaults)
 
 **Buildings**  
 All buildings currently take 1–3 months to complete in the shipped prototype. Only one of each type can be built per category unless specified. Workers can be assigned to speed production.  
@@ -127,6 +126,8 @@ Each card shows cost, build time, and the resource output or upkeep it contribut
 - Wall: Reduces ground assault damage by 40%. Cost: 50 lumber, 30 steel. Build time: 2 months.  
 
 **Units** (Military tab)  
+The current UI uses plus/minus stepper controls for training and assault counts rather than editable number fields.
+
 - Soldier: Cost: 8 nutrition, 4 steel. Upkeep: 0.5 nutrition per year. Attack power: 10.  
 - Tank: Cost: 12 steel, 8 oil. Upkeep: 1 nutrition + 0.5 oil per year. Attack power: 25. Requires Tanks research.  
 - War Ship: Cost: 30 steel, 20 oil, 15 alloy. Upkeep: 2 nutrition + 1 oil per year. Attack power: 50. Requires Naval Warfare research and Dry Dock.

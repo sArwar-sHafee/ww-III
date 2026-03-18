@@ -15,6 +15,7 @@ const state = {
   noticeTimer: null,
   lastTabSignature: null,
   forceTabRefresh: false,
+  unitDrafts: {},
   warRoomDraft: { soldier: 10, tank: 1, war_ship: 0, fighter_zed: 0 }
 };
 
@@ -27,7 +28,7 @@ const emojis = {
   missile_silo: '🚀', anti_missile_battery: '🛡️', wall: '🧱',
   soldier: '🪖', tank: '🛞', war_ship: '🚢', fighter_zed: '🛩️', scout_drone: '🛰️'
 };
-const tabs = ['dashboard', 'economy', 'buildings', 'table_view', 'military', 'defences', 'research', 'war_room'];
+const tabs = ['dashboard', 'economy', 'buildings', 'military', 'defences', 'research', 'war_room'];
 
 const topBar = document.getElementById('topBar');
 const eventsEl = document.getElementById('events');
@@ -192,19 +193,44 @@ function getTabSignature(game) {
   }
 
   if (state.tab === 'economy' || state.tab === 'buildings') {
-    return JSON.stringify({ phase, year });
+    return JSON.stringify({
+      phase,
+      buildings: you.buildings,
+      buildingQueues: you.buildingQueues,
+      research: you.research.completed,
+      resources: flooredResources(you.resources)
+    });
   }
 
   if (state.tab === 'military') {
-    return JSON.stringify({ phase, year });
+    return JSON.stringify({
+      phase,
+      units: you.units,
+      buildings: you.buildings,
+      buildingQueues: you.buildingQueues,
+      research: you.research.completed,
+      resources: flooredResources(you.resources)
+    });
   }
 
   if (state.tab === 'defences') {
-    return JSON.stringify({ phase, year });
+    return JSON.stringify({
+      phase,
+      buildings: you.buildings,
+      buildingQueues: you.buildingQueues,
+      research: you.research.completed,
+      resources: flooredResources(you.resources)
+    });
   }
 
   if (state.tab === 'research') {
-    return JSON.stringify({ phase, year });
+    return JSON.stringify({
+      phase,
+      year,
+      active: you.research.active,
+      completed: you.research.completed,
+      resources: flooredResources(you.resources)
+    });
   }
 
   if (state.tab === 'war_room') {
@@ -219,15 +245,27 @@ function getTabSignature(game) {
     });
   }
 
-  if (state.tab === 'table_view') {
-    return JSON.stringify({ phase, year });
-  }
-
   return JSON.stringify({ phase, year });
 }
 
 function updateWarRoomDraft(field, value) {
   state.warRoomDraft[field] = Math.max(0, Number(value || 0));
+}
+
+function getUnitDraft(id) {
+  return Math.max(1, Number(state.unitDrafts[id] || 1));
+}
+
+function adjustUnitDraft(id, delta) {
+  state.unitDrafts[id] = Math.max(1, getUnitDraft(id) + delta);
+  state.forceTabRefresh = true;
+  renderAll();
+}
+
+function adjustWarRoomDraft(field, delta) {
+  updateWarRoomDraft(field, state.warRoomDraft[field] + delta);
+  state.forceTabRefresh = true;
+  renderAll();
 }
 
 function getResourceStateClass(value, net) {
@@ -430,6 +468,7 @@ function renderDashboard() {
       </div>
     </div>
     ${renderPendingActions()}
+    ${renderSummaryTables()}
   `;
 }
 
@@ -464,12 +503,11 @@ function renderMilitary() {
       <div class="small">Owned: ${you.units[id]}</div>
       <div class="small">Cost: ${costLine(unit.cost)}</div>
       ${renderReasons(unitState.reasons)}
-      <div class="row">
-        <input id="amt_${id}" value="1" type="number" min="1" />
-        ${actionBtn('Train', () => {
-          const amount = Math.max(1, Number(document.getElementById(`amt_${id}`).value || 1));
-          sendAction('train', { id, amount });
-        }, { disabled: unitState.disabled, title: unitState.reasons.join(' | ') })}
+      <div class="row stepper">
+        ${actionBtn('-', () => adjustUnitDraft(id, -1))}
+        <input id="amt_${id}" value="${getUnitDraft(id)}" type="number" min="1" readonly />
+        ${actionBtn('+', () => adjustUnitDraft(id, 1))}
+        ${actionBtn('Train', () => sendAction('train', { id, amount: getUnitDraft(id) }), { disabled: unitState.disabled, title: unitState.reasons.join(' | ') })}
       </div>
     </div>`;
   }).join('');
@@ -506,7 +544,7 @@ function renderDefences() {
   `;
 }
 
-function renderTableView() {
+function renderSummaryTables() {
   const you = state.game.you;
   const resourceRows = state.meta.resources.map((resource) => {
     const value = Math.floor(you.resources[resource]);
@@ -523,7 +561,7 @@ function renderTableView() {
     <tr><td>${emojis[id] || ''} ${unit.name}</td><td>${you.units[id]}</td></tr>
   `).join('');
 
-  tabContent.innerHTML = `
+  return `
     <div class="split-panels">
       <div class="panel inset">
         <h3>Resources</h3>
@@ -588,31 +626,25 @@ function renderWarRoom() {
         </select>
         ${actionBtn('Launch Missile', () => sendAction('missile', { target: document.getElementById('wrTarget').value }), { disabled: missileState.disabled, title: missileState.reasons.join(' | ') })}
       </div>
-      <div class="row compact" title="Commit: Soldier, Tank, War Ship, Fighter Zed">
-        🪖<input id="wr_soldier" type="number" value="${state.warRoomDraft.soldier}" min="0" />
-        🛞<input id="wr_tank" type="number" value="${state.warRoomDraft.tank}" min="0" />
-        🚢<input id="wr_war_ship" type="number" value="${state.warRoomDraft.war_ship}" min="0" />
-        🛩️<input id="wr_fighter_zed" type="number" value="${state.warRoomDraft.fighter_zed}" min="0" />
+      <div class="war-room-grid" title="Commit: Soldier, Tank, War Ship, Fighter Zed">
+        <div class="row stepper">🪖${actionBtn('-', () => adjustWarRoomDraft('soldier', -1))}<input id="wr_soldier" type="number" value="${state.warRoomDraft.soldier}" min="0" readonly />${actionBtn('+', () => adjustWarRoomDraft('soldier', 1))}</div>
+        <div class="row stepper">🛞${actionBtn('-', () => adjustWarRoomDraft('tank', -1))}<input id="wr_tank" type="number" value="${state.warRoomDraft.tank}" min="0" readonly />${actionBtn('+', () => adjustWarRoomDraft('tank', 1))}</div>
+        <div class="row stepper">🚢${actionBtn('-', () => adjustWarRoomDraft('war_ship', -1))}<input id="wr_war_ship" type="number" value="${state.warRoomDraft.war_ship}" min="0" readonly />${actionBtn('+', () => adjustWarRoomDraft('war_ship', 1))}</div>
+        <div class="row stepper">🛩️${actionBtn('-', () => adjustWarRoomDraft('fighter_zed', -1))}<input id="wr_fighter_zed" type="number" value="${state.warRoomDraft.fighter_zed}" min="0" readonly />${actionBtn('+', () => adjustWarRoomDraft('fighter_zed', 1))}</div>
         ${actionBtn('Commit Assault', () => sendAction('assault', {
-          soldier: Number(document.getElementById('wr_soldier').value),
-          tank: Number(document.getElementById('wr_tank').value),
-          war_ship: Number(document.getElementById('wr_war_ship').value),
-          fighter_zed: Number(document.getElementById('wr_fighter_zed').value)
+          soldier: state.warRoomDraft.soldier,
+          tank: state.warRoomDraft.tank,
+          war_ship: state.warRoomDraft.war_ship,
+          fighter_zed: state.warRoomDraft.fighter_zed
         }), { disabled: state.game.phase !== 'active', title: state.game.phase !== 'active' ? 'Match not active' : '' })}
       </div>
     </div>`;
-
-  ['soldier', 'tank', 'war_ship', 'fighter_zed'].forEach((field) => {
-    const input = document.getElementById(`wr_${field}`);
-    input?.addEventListener('input', (event) => updateWarRoomDraft(field, event.target.value));
-  });
 }
 
 function renderTab() {
   if (!state.game?.you) return;
   if (state.tab === 'dashboard') return renderDashboard();
   if (state.tab === 'economy' || state.tab === 'buildings') return renderEconomyOrBuildings();
-  if (state.tab === 'table_view') return renderTableView();
   if (state.tab === 'military') return renderMilitary();
   if (state.tab === 'defences') return renderDefences();
   if (state.tab === 'research') return renderResearch();

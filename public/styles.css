@@ -276,6 +276,16 @@ button:disabled {
   width: 60px;
 }
 
+.stepper input {
+  width: 58px;
+  text-align: center;
+}
+
+.war-room-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
 .hidden { display: none !important; }
 
 #roomInfo {
