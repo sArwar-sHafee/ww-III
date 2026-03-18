@@ -66,6 +66,7 @@ const rooms = new Map();
 function createPlayer(playerId, name) {
   return {
     playerId,
+    reconnectToken: randomUUID(),
     name,
     population: 10,
     populationMax: 10,
@@ -82,6 +83,13 @@ function createPlayer(playerId, name) {
     zeroYears: 0,
     disconnected: false
   };
+}
+
+function getRoomPhase(room) {
+  if (room.winner) return 'finished';
+  if (room.playerOrder.length < 2) return 'waiting';
+  if (room.ticks === 0 && Date.now() < room.tickEndsAt) return 'countdown';
+  return 'active';
 }
 
 function appendEvent(player, year, message, type = 'info') {
@@ -300,6 +308,7 @@ function stripStateFor(room, playerId) {
     roomId: room.roomId,
     year: room.year,
     month: room.month,
+    phase: getRoomPhase(room),
     tickEndsAt: room.tickEndsAt,
     winner: room.winner,
     you: {
@@ -386,22 +395,13 @@ const server = http.createServer(async (req, res) => {
       const playerId = randomUUID();
       room.players[playerId] = createPlayer(playerId, name || 'Player 1');
       room.playerOrder.push(playerId);
-      return writeJson(res, 200, { roomId: room.roomId, playerId });
+      return writeJson(res, 200, { roomId: room.roomId, playerId, reconnectToken: room.players[playerId].reconnectToken });
     }
 
     if (url.pathname === '/api/room/join' && req.method === 'POST') {
       const { roomId, name } = await parseBody(req);
       const room = rooms.get(roomId);
       if (!room) return writeJson(res, 400, { error: 'Room not found' });
-
-      // Reconnection logic
-      const existingPlayerId = Object.keys(room.players).find(id => room.players[id].name === name);
-      if (existingPlayerId) {
-        if (room.players[existingPlayerId].sse) {
-          return writeJson(res, 400, { error: 'Player already connected' });
-        }
-        return writeJson(res, 200, { roomId, playerId: existingPlayerId });
-      }
 
       if (room.playerOrder.length >= 2) return writeJson(res, 400, { error: 'Room full' });
 
@@ -412,7 +412,16 @@ const server = http.createServer(async (req, res) => {
       appendEvent(room.players[room.playerOrder[0]], room.year, 'Opponent joined. 10s countdown started.');
       appendEvent(room.players[room.playerOrder[1]], room.year, 'Joined room. 10s countdown started.');
       broadcastRoom(room);
-      return writeJson(res, 200, { roomId, playerId });
+      return writeJson(res, 200, { roomId, playerId, reconnectToken: room.players[playerId].reconnectToken });
+    }
+
+    if (url.pathname === '/api/room/reconnect' && req.method === 'POST') {
+      const { roomId, reconnectToken } = await parseBody(req);
+      const room = rooms.get(roomId);
+      if (!room) return writeJson(res, 404, { error: 'Room not found' });
+      const player = Object.values(room.players).find((entry) => entry.reconnectToken === reconnectToken);
+      if (!player) return writeJson(res, 403, { error: 'Reconnect failed' });
+      return writeJson(res, 200, { roomId, playerId: player.playerId, reconnectToken: player.reconnectToken });
     }
 
     if (url.pathname === '/api/state' && req.method === 'GET') {
@@ -433,6 +442,9 @@ const server = http.createServer(async (req, res) => {
         Connection: 'keep-alive',
         'X-Accel-Buffering': 'no'
       });
+      if (room.players[playerId].sse && room.players[playerId].sse !== res) {
+        try { room.players[playerId].sse.end(); } catch (e) {}
+      }
       room.players[playerId].sse = res;
       sendSSE(res, stripStateFor(room, playerId));
 
@@ -531,6 +543,13 @@ const server = http.createServer(async (req, res) => {
             opponent.chat = opponent.chat.slice(-20);
           }
         }
+      } else if (type === 'cancel_pending') {
+        const index = Number(payload.index);
+        if (!Number.isInteger(index) || index < 0 || index >= p.pending.length) {
+          return writeJson(res, 400, { error: 'Invalid pending action' });
+        }
+        const [removed] = p.pending.splice(index, 1);
+        appendEvent(p, room.year, `Cancelled queued action: ${removed.type}`);
       } else {
         queueAction(room, p, { type, ...payload });
       }

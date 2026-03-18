@@ -1,14 +1,26 @@
-const state = { roomId: null, playerId: null, meta: null, game: null, tab: 'dashboard', lastStateAt: 0, pollTimer: null };
+const SESSION_KEY = 'wwiii_session_v2';
+const MISSILE_COST = { steel: 8, oil: 6, electricity: 3 };
+const state = {
+  roomId: null,
+  playerId: null,
+  reconnectToken: null,
+  meta: null,
+  game: null,
+  tab: 'dashboard',
+  lastStateAt: 0,
+  pollTimer: null,
+  es: null,
+  connection: 'idle',
+  notice: null
+};
+
 const DEFAULT_API_ORIGIN = 'https://ww-iii.onrender.com';
 const API_ORIGIN = window.WWIII_API_ORIGIN || (window.location.hostname.endsWith('.vercel.app') ? DEFAULT_API_ORIGIN : '');
 const emojis = {
-  // Resources
   nutrition: '🍲', lumber: '🪵', steel: '🔩', alloy: '🪙', oil: '🛢️', magnet: '🧲', electricity: '⚡', glass: '🪟', plastic: '♻️', concrete: '🧱', silicon: '💾',
-  // Buildings
   farm: '🌾', lumber_camp: '🪓', steel_mill: '🏭', alloy_quarry: '⛏️', oil_rig: '🛢️', magnet_extractor: '🧲', power_plant: '⚡', glassworks: '🪟', plastics_plant: '🧪', concrete_plant: '🧱', silicon_refinery: '💾',
   house: '🏠', barracks: '🪖', factory: '🏭', radar_station: '📡', dry_dock: '⚓', airfield: '🛫',
   missile_silo: '🚀', anti_missile_battery: '🛡️', wall: '🧱',
-  // Units
   soldier: '🪖', tank: '🛞', war_ship: '🚢', fighter_zed: '🛩️', scout_drone: '🛰️'
 };
 const tabs = ['dashboard', 'economy', 'buildings', 'military', 'research', 'war_room'];
@@ -22,9 +34,18 @@ const tabsEl = document.getElementById('tabs');
 const roomInfoEl = document.getElementById('roomInfo');
 const joinFlowEl = document.getElementById('joinFlow');
 const roomInputEl = document.getElementById('roomInput');
+const statusBannerEl = document.getElementById('statusBanner');
+const setupEl = document.getElementById('setup');
+const gameLayoutEl = document.getElementById('gameLayout');
+const nameEl = document.getElementById('name');
+const chatInputEl = document.getElementById('chatInput');
 
 async function api(path, body) {
-  const res = await fetch(`${API_ORIGIN}${path}`, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const res = await fetch(`${API_ORIGIN}${path}`, {
+    method: body ? 'POST' : 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined
+  });
   const contentType = res.headers.get('content-type') || '';
   if (contentType.includes('application/json')) {
     const json = await res.json();
@@ -37,8 +58,101 @@ async function api(path, body) {
   throw new Error(`Unexpected server response (${res.status}) for ${path}: ${snippet}`);
 }
 
+function setNotice(message, type = 'info') {
+  state.notice = message ? { message, type } : null;
+  renderStatusBanner();
+}
+
+function saveSession() {
+  if (!state.roomId || !state.playerId || !state.reconnectToken) return;
+  localStorage.setItem(SESSION_KEY, JSON.stringify({
+    roomId: state.roomId,
+    playerId: state.playerId,
+    reconnectToken: state.reconnectToken,
+    name: nameEl.value.trim()
+  }));
+}
+
+function clearSession() {
+  localStorage.removeItem(SESSION_KEY);
+}
+
+function readSession() {
+  try {
+    return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+  } catch (_) {
+    return null;
+  }
+}
+
+function closeStream() {
+  if (state.es) state.es.close();
+  state.es = null;
+}
+
 async function ensureMeta() {
   if (!state.meta) state.meta = await api('/api/meta');
+}
+
+function getPhaseLabel() {
+  const phase = state.game?.phase;
+  if (phase === 'waiting') return 'Waiting for opponent';
+  if (phase === 'countdown') return 'Match starts soon';
+  if (phase === 'finished') return state.game?.winner === state.playerId ? 'Victory' : 'Defeat';
+  return 'Live match';
+}
+
+function getCountdownSeconds() {
+  if (!state.game?.tickEndsAt) return 0;
+  return Math.max(0, Math.ceil((state.game.tickEndsAt - Date.now()) / 1000));
+}
+
+function getConnectionLabel() {
+  if (state.connection === 'live') return 'Live sync';
+  if (state.connection === 'polling') return 'Reconnecting';
+  if (state.connection === 'restoring') return 'Restoring session';
+  return 'Offline';
+}
+
+function renderStatusBanner() {
+  const parts = [];
+  const phase = state.game?.phase;
+
+  if (state.roomId && !state.game) parts.push({ type: 'info', message: `Connecting to room ${state.roomId}...` });
+  if (state.game) {
+    if (phase === 'waiting') parts.push({ type: 'info', message: `Room ${state.roomId} created. Share the 4-digit code with your opponent.` });
+    if (phase === 'countdown') parts.push({ type: 'warn', message: `Opponent connected. Match starts in ${getCountdownSeconds()}s.` });
+    if (phase === 'finished') parts.push({ type: state.game.winner === state.playerId ? 'success' : 'error', message: getPhaseLabel() });
+    if (state.connection !== 'live') parts.push({ type: 'warn', message: getConnectionLabel() });
+  }
+  if (state.notice) parts.push(state.notice);
+
+  if (!parts.length) {
+    statusBannerEl.className = 'status hidden';
+    statusBannerEl.textContent = '';
+    return;
+  }
+
+  const tone = parts.some((part) => part.type === 'error') ? 'error'
+    : parts.some((part) => part.type === 'warn') ? 'warn'
+    : parts.some((part) => part.type === 'success') ? 'success'
+    : 'info';
+
+  statusBannerEl.className = `status ${tone}`;
+  statusBannerEl.innerHTML = parts.map((part) => `<div>${part.message}</div>`).join('');
+}
+
+function getResourceCapacity(resourceKey, buildings) {
+  let capacity = Infinity;
+  for (const [id, count] of Object.entries(buildings || {})) {
+    const cap = state.meta.buildings[id]?.capacity?.[resourceKey];
+    if (cap) capacity = Number.isFinite(capacity) ? capacity + cap * count : cap * count;
+  }
+  return capacity;
+}
+
+function formatDelta(value) {
+  return `${value >= 0 ? '+' : ''}${Math.floor(value)}`;
 }
 
 function renderTopBar() {
@@ -46,26 +160,40 @@ function renderTopBar() {
   const you = state.game.you;
   const items = [
     `<span>📅 Year ${state.game.year}, Month ${state.game.month}</span>`,
-    `<span>👥 Pop: ${you.population}/${you.populationMax}</span>`
+    `<span>👥 Pop: ${you.population}/${you.populationMax}</span>`,
+    `<span>🎯 ${getPhaseLabel()}</span>`
   ];
-  for (const r of state.meta.resources) {
-    const value = Math.floor(you.resources[r]);
-    const net = you.net?.[r] ?? 0;
+
+  for (const resource of state.meta.resources) {
+    const value = Math.floor(you.resources[resource]);
+    const net = you.net?.[resource] ?? 0;
+    const capacity = getResourceCapacity(resource, you.buildings);
+    const isCapped = Number.isFinite(capacity) && value >= capacity;
     let cls = '';
-    if (value <= 0) cls = 'red';
-    else if (net < 0) cls = 'yellow';
-    items.push(`<span class="${cls}">${emojis[r]} ${r}: <b>${value}</b> <small>(${net >= 0 ? '+' : ''}${Math.floor(net)})</small></span>`);
+    if (value <= 0 || net < 0) cls = 'red';
+    if (isCapped) cls = 'red blink';
+    items.push(`<span class="${cls}">${emojis[resource]} ${resource}: <b>${value}</b> <small>(${formatDelta(net)})</small></span>`);
   }
-  const secLeft = Math.max(0, Math.floor((state.game.tickEndsAt - Date.now()) / 1000));
-  topBar.innerHTML = items.join('') + `<span>⏱️ ${secLeft}s</span>`;
+
+  const countdown = state.game.phase === 'countdown' ? `${getCountdownSeconds()}s to start` : `${getCountdownSeconds()}s`;
+  topBar.innerHTML = items.join('') + `<span>⏱️ ${countdown}</span>`;
 }
 
 function renderEvents() {
-  eventsEl.innerHTML = (state.game?.you.eventLog || []).map((e) => `<li class="${e.type || ''}">[Y${e.year}] ${e.message}</li>`).join('');
+  eventsEl.innerHTML = (state.game?.you.eventLog || []).map((event) => `<li class="${event.type || ''}">[Y${event.year}] ${event.message}</li>`).join('');
 }
 
 function renderChat() {
-  chatEl.innerHTML = (state.game?.you.chat || []).map((m) => `<div>[Y${m.year}] <b>${m.from}</b>: ${m.text}</div>`).join('');
+  chatEl.innerHTML = (state.game?.you.chat || []).map((message) => `<div>[Y${message.year}] <b>${message.from}</b>: ${message.text}</div>`).join('');
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function formatIntelSection(title, data) {
+  const rows = Object.entries(data)
+    .filter(([, value]) => value > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([key, value]) => `${emojis[key] || ''} ${key.replace(/_/g, ' ')}: ${Math.floor(value)}`);
+  return `${title}\n${rows.length ? rows.join('\n') : 'No known assets.'}`;
 }
 
 function renderIntel() {
@@ -74,125 +202,340 @@ function renderIntel() {
     intelEl.textContent = 'No active scouting intel.';
     return;
   }
-  intelEl.textContent = `Intel expires Y${intel.expiresAt}\n\nBuildings:\n${JSON.stringify(intel.buildings, null, 2)}\n\nApprox Resources:\n${JSON.stringify(intel.resources, null, 2)}`;
+
+  intelEl.textContent = `Intel expires at Year ${intel.expiresAt}\n\n${formatIntelSection('Buildings', intel.buildings)}\n\n${formatIntelSection('Approx Resources', intel.resources)}`;
 }
 
 function costLine(cost) {
-  return Object.entries(cost).map(([k, v]) => `${emojis[k] || ''}${k}:${v}`).join(', ');
+  return Object.entries(cost).map(([key, value]) => `${emojis[key] || ''}${key}:${value}`).join(', ');
 }
 
-function actionBtn(label, cb, disabled = false) {
+function getMissingCost(cost, amount = 1) {
+  const resources = state.game?.you.resources || {};
+  return Object.entries(cost)
+    .filter(([key, value]) => (resources[key] ?? 0) < value * amount)
+    .map(([key, value]) => `${key} ${value * amount}`);
+}
+
+function getBuildCardState(id) {
+  const you = state.game.you;
+  const building = state.meta.buildings[id];
+  const inQueue = you.buildingQueues.find((queue) => queue.id === id);
+  const reasons = [];
+  if (state.game.phase !== 'active') reasons.push('Match not active');
+  if (inQueue) reasons.push('Already building');
+  if (building.requires && !building.requires.every((tech) => you.research.completed.includes(tech))) reasons.push(`Needs ${building.requires.join(', ')}`);
+  const missing = getMissingCost(building.cost);
+  if (missing.length) reasons.push(`Missing ${missing.join(', ')}`);
+  return { disabled: reasons.length > 0, reasons, inQueue };
+}
+
+function getUnitCardState(id, amount = 1) {
+  const you = state.game.you;
+  const unit = state.meta.units[id];
+  const reasons = [];
+  if (state.game.phase !== 'active') reasons.push('Match not active');
+  if (unit.requiresBuilding && you.buildings[unit.requiresBuilding] <= 0) reasons.push(`Needs ${unit.requiresBuilding.replace(/_/g, ' ')}`);
+  if (unit.requiresTech && !you.research.completed.includes(unit.requiresTech)) reasons.push(`Needs ${unit.requiresTech.replace(/_/g, ' ')}`);
+  const missing = getMissingCost(unit.cost, amount);
+  if (missing.length) reasons.push(`Missing ${missing.join(', ')}`);
+  return { disabled: reasons.length > 0, reasons };
+}
+
+function getResearchCardState(id) {
+  const you = state.game.you;
+  const tech = state.meta.research[id];
+  const reasons = [];
+  const isCurrent = you.research.active?.id === id;
+  if (state.game.phase !== 'active') reasons.push('Match not active');
+  if (you.research.completed.includes(id)) reasons.push('Completed');
+  if (you.research.active && !isCurrent) reasons.push('Research in progress');
+  if (tech.minYear && state.game.year < tech.minYear) reasons.push(`Available Year ${tech.minYear}`);
+  if (tech.prereq && !you.research.completed.includes(tech.prereq)) reasons.push(`Needs ${tech.prereq.replace(/_/g, ' ')}`);
+  const missing = getMissingCost(tech.cost);
+  if (missing.length && !isCurrent) reasons.push(`Missing ${missing.join(', ')}`);
+  return { disabled: reasons.length > 0, reasons, isCurrent };
+}
+
+function getQuickActionState(type) {
+  const you = state.game.you;
+  const reasons = [];
+  if (state.game.phase !== 'active') reasons.push('Match not active');
+  if (type === 'scout') {
+    if (you.units.scout_drone <= 0) reasons.push('Need scout drone');
+    if (state.game.year < you.scoutCooldownUntil) reasons.push(`Cooldown until Year ${you.scoutCooldownUntil}`);
+  }
+  if (type === 'missile') {
+    if (you.buildings.missile_silo <= 0) reasons.push('Need missile silo');
+    const missing = getMissingCost(MISSILE_COST);
+    if (missing.length) reasons.push(`Missing ${missing.join(', ')}`);
+  }
+  return { disabled: reasons.length > 0, reasons };
+}
+
+function actionBtn(label, cb, options = {}) {
   const id = `btn_${Math.random().toString(36).slice(2)}`;
-  if (!disabled) setTimeout(() => document.getElementById(id)?.addEventListener('click', cb));
-  return `<button id="${id}" ${disabled ? 'disabled' : ''}>${label}</button>`;
+  if (!options.disabled) {
+    setTimeout(() => document.getElementById(id)?.addEventListener('click', cb));
+  }
+  return `<button id="${id}" ${options.disabled ? 'disabled' : ''} title="${options.title || ''}">${label}</button>`;
+}
+
+function renderReasons(reasons) {
+  return reasons.length ? `<div class="small warning">${reasons.join(' • ')}</div>` : '';
+}
+
+function formatPendingAction(action) {
+  if (action.type === 'missile') return `Missile strike -> ${action.target}`;
+  if (action.type === 'scout') return 'Scout mission';
+  if (action.type === 'assault') {
+    const forces = ['soldier', 'tank', 'war_ship', 'fighter_zed']
+      .map((key) => action[key] ? `${emojis[key]}${action[key]}` : '')
+      .filter(Boolean)
+      .join(' ');
+    return `Assault ${forces || '(no forces)'}`;
+  }
+  return action.type;
+}
+
+function renderPendingActions() {
+  const pending = state.game?.you.pending || [];
+  const items = pending.length ? pending.map((action, index) => `
+    <div class="pending-item">
+      <span>${index + 1}. ${formatPendingAction(action)}</span>
+      ${actionBtn('Cancel', () => sendAction('cancel_pending', { index }))}
+    </div>
+  `).join('') : '<div class="small">No queued actions.</div>';
+  return `<div class="panel inset"><h3>Queued Actions</h3>${items}</div>`;
+}
+
+function renderDashboard() {
+  const you = state.game.you;
+  const opponent = state.game.opponent?.name || 'Waiting...';
+  const roomCode = `<b>${state.game.roomId}</b>`;
+  const summary = state.game.phase === 'countdown'
+    ? `Match begins in ${getCountdownSeconds()} seconds.`
+    : state.game.phase === 'waiting'
+      ? 'Share the room code and wait for your opponent to connect.'
+      : state.game.phase === 'finished'
+        ? 'The match has ended.'
+        : 'Queue actions before the next year resolves.';
+
+  tabContent.innerHTML = `
+    <h3>Dashboard</h3>
+    <div class="summary-grid">
+      <div class="card">
+        <b>Command Status</b>
+        <div class="small">Room: ${roomCode}</div>
+        <div class="small">You: ${you.name}</div>
+        <div class="small">Opponent: ${opponent}</div>
+        <div class="small">Phase: ${getPhaseLabel()}</div>
+        <div class="small">${summary}</div>
+      </div>
+      <div class="card">
+        <b>Connection</b>
+        <div class="small">${getConnectionLabel()}</div>
+        <div class="small">Session recovery is enabled in this browser.</div>
+        <div class="small">Chat remains available before the match starts.</div>
+      </div>
+    </div>
+    ${renderPendingActions()}
+  `;
+}
+
+function renderEconomyOrBuildings() {
+  const you = state.game.you;
+  const ids = Object.keys(state.meta.buildings).filter((id) => state.tab === 'economy' ? state.meta.buildings[id].category === 'economy' : true);
+  tabContent.innerHTML = `<h3>${state.tab === 'economy' ? 'Economy' : 'Buildings'}</h3><div class="action-grid">` + ids.map((id) => {
+    const building = state.meta.buildings[id];
+    const cardState = getBuildCardState(id);
+    const label = cardState.inQueue ? `Building... (${Math.ceil(cardState.inQueue.ticksRemaining / 5)} months)` : 'Build';
+    return `<div class="card">
+      <b>${emojis[id] || ''} ${building.name}</b>
+      <div class="small">Owned: ${you.buildings[id]} | Build time: ${building.buildTime} years</div>
+      <div class="small">Cost: ${costLine(building.cost)}</div>
+      ${renderReasons(cardState.reasons)}
+      ${actionBtn(label, () => sendAction('build', { id }), { disabled: cardState.disabled, title: cardState.reasons.join(' | ') })}
+    </div>`;
+  }).join('') + '</div>';
+}
+
+function renderMilitary() {
+  const you = state.game.you;
+  const unitIds = Object.keys(state.meta.units);
+  const defenseIds = ['missile_silo', 'anti_missile_battery', 'wall'];
+  const scoutState = getQuickActionState('scout');
+  const missileState = getQuickActionState('missile');
+
+  let html = '<h3>Military Units</h3><div class="action-grid">';
+  html += unitIds.map((id) => {
+    const unit = state.meta.units[id];
+    const unitState = getUnitCardState(id);
+    return `<div class="card">
+      <b>${emojis[id] || ''} ${unit.name}</b>
+      <div class="small">Owned: ${you.units[id]}</div>
+      <div class="small">Cost: ${costLine(unit.cost)}</div>
+      ${renderReasons(unitState.reasons)}
+      <div class="row">
+        <input id="amt_${id}" value="1" type="number" min="1" />
+        ${actionBtn('Train', () => {
+          const amount = Math.max(1, Number(document.getElementById(`amt_${id}`).value || 1));
+          sendAction('train', { id, amount });
+        }, { disabled: unitState.disabled, title: unitState.reasons.join(' | ') })}
+      </div>
+    </div>`;
+  }).join('');
+  html += '</div>';
+
+  html += '<h3>Defenses</h3><div class="action-grid">';
+  html += defenseIds.map((id) => {
+    const building = state.meta.buildings[id];
+    const cardState = getBuildCardState(id);
+    const label = cardState.inQueue ? `Building... (${Math.ceil(cardState.inQueue.ticksRemaining / 5)} months)` : 'Build';
+    return `<div class="card">
+      <b>${emojis[id] || ''} ${building.name}</b>
+      <div class="small">Owned: ${you.buildings[id]} | Build time: ${building.buildTime} years</div>
+      <div class="small">Cost: ${costLine(building.cost)}</div>
+      ${renderReasons(cardState.reasons)}
+      ${actionBtn(label, () => sendAction('build', { id }), { disabled: cardState.disabled, title: cardState.reasons.join(' | ') })}
+    </div>`;
+  }).join('');
+  html += '</div>';
+
+  html += `<h3>Quick War Orders</h3>
+    <div class="card">
+      ${renderReasons(scoutState.reasons)}
+      <div class="row">
+        ${actionBtn('Queue Scout', () => sendAction('scout', {}), { disabled: scoutState.disabled, title: scoutState.reasons.join(' | ') })}
+        <select id="missileTarget">
+          <option value="economy">Economy</option>
+          <option value="military">Military</option>
+          <option value="support">Population Centers</option>
+        </select>
+        ${actionBtn('Queue Missile', () => sendAction('missile', { target: document.getElementById('missileTarget').value }), { disabled: missileState.disabled, title: missileState.reasons.join(' | ') })}
+      </div>
+      ${renderReasons(missileState.reasons)}
+      <div class="row compact" title="Commit: Soldier, Tank, War Ship, Fighter Zed">
+        🪖<input id="ass_soldier" type="number" value="5" min="0" />
+        🛞<input id="ass_tank" type="number" value="0" min="0" />
+        🚢<input id="ass_war_ship" type="number" value="0" min="0" />
+        🛩️<input id="ass_fighter_zed" type="number" value="0" min="0" />
+        ${actionBtn('Queue Assault', () => sendAction('assault', {
+          soldier: Number(document.getElementById('ass_soldier').value),
+          tank: Number(document.getElementById('ass_tank').value),
+          war_ship: Number(document.getElementById('ass_war_ship').value),
+          fighter_zed: Number(document.getElementById('ass_fighter_zed').value)
+        }), { disabled: state.game.phase !== 'active', title: state.game.phase !== 'active' ? 'Match not active' : '' })}
+      </div>
+    </div>`;
+
+  tabContent.innerHTML = html;
+}
+
+function renderResearch() {
+  const you = state.game.you;
+  tabContent.innerHTML = `<h3>Research</h3>
+    <div class="small">Active: ${you.research.active ? `${state.meta.research[you.research.active.id].name} (${Math.ceil(you.research.active.ticksRemaining / 5)} months left)` : 'None'}</div>
+    <div class="action-grid">` +
+    Object.entries(state.meta.research).map(([id, tech]) => {
+      const cardState = getResearchCardState(id);
+      const progress = cardState.isCurrent ? Math.max(0, 100 - Math.floor((you.research.active.ticksRemaining / (tech.years * 60)) * 100)) : (you.research.completed.includes(id) ? 100 : 0);
+      const label = cardState.isCurrent ? `Researching... ${progress}%` : 'Start';
+      return `<div class="card">
+        <b>${tech.name}</b>
+        <div class="small">Cost: ${costLine(tech.cost)} | ${tech.years} years</div>
+        <div class="small">Progress: ${progress}%</div>
+        <div class="progress"><span style="width:${progress}%"></span></div>
+        ${renderReasons(cardState.reasons)}
+        ${actionBtn(label, () => sendAction('research', { id }), { disabled: cardState.disabled, title: cardState.reasons.join(' | ') })}
+      </div>`;
+    }).join('') + '</div>';
+}
+
+function renderWarRoom() {
+  const scoutState = getQuickActionState('scout');
+  const missileState = getQuickActionState('missile');
+  tabContent.innerHTML = `<h3>War Room</h3>
+    <p>Queue actions now. All attacks resolve when the current year ends.</p>
+    ${renderPendingActions()}
+    <div class="card">
+      ${renderReasons(scoutState.reasons)}
+      <div class="row">${actionBtn('Launch Scout', () => sendAction('scout', {}), { disabled: scoutState.disabled, title: scoutState.reasons.join(' | ') })}</div>
+      ${renderReasons(missileState.reasons)}
+      <div class="row">
+        <select id="wrTarget">
+          <option value="economy">Economy</option>
+          <option value="military">Military</option>
+          <option value="support">Population Centers</option>
+        </select>
+        ${actionBtn('Launch Missile', () => sendAction('missile', { target: document.getElementById('wrTarget').value }), { disabled: missileState.disabled, title: missileState.reasons.join(' | ') })}
+      </div>
+      <div class="row compact" title="Commit: Soldier, Tank, War Ship, Fighter Zed">
+        🪖<input id="wr_soldier" type="number" value="10" min="0" />
+        🛞<input id="wr_tank" type="number" value="1" min="0" />
+        🚢<input id="wr_war_ship" type="number" value="0" min="0" />
+        🛩️<input id="wr_fighter_zed" type="number" value="0" min="0" />
+        ${actionBtn('Commit Assault', () => sendAction('assault', {
+          soldier: Number(document.getElementById('wr_soldier').value),
+          tank: Number(document.getElementById('wr_tank').value),
+          war_ship: Number(document.getElementById('wr_war_ship').value),
+          fighter_zed: Number(document.getElementById('wr_fighter_zed').value)
+        }), { disabled: state.game.phase !== 'active', title: state.game.phase !== 'active' ? 'Match not active' : '' })}
+      </div>
+    </div>`;
 }
 
 function renderTab() {
-  const you = state.game?.you;
-  if (!you) return;
-  if (state.tab === 'dashboard') {
-    tabContent.innerHTML = `<h3>Dashboard</h3>
-      <p>Room: <b>${state.game.roomId}</b> | You: ${you.name} | Opponent: ${state.game.opponent?.name || 'Waiting...'}</p>`;
-    return;
-  }
-
-  if (state.tab === 'economy' || state.tab === 'buildings') {
-    const ids = Object.keys(state.meta.buildings).filter((k) => state.tab === 'economy' ? state.meta.buildings[k].category === 'economy' : true);
-    tabContent.innerHTML = `<h3>${state.tab === 'economy' ? 'Economy' : 'Buildings'}</h3><div class='action-grid'>` + ids.map((id) => {
-      const b = state.meta.buildings[id];
-      const inQueue = you.buildingQueues.find((q) => q.id === id);
-      const label = inQueue ? `Building... (${Math.ceil(inQueue.ticksRemaining / 5)}m)` : 'Build';
-      return `<div class='card'><b>${emojis[id] || ''} ${b.name}</b><div class='small'>Owned: ${you.buildings[id]} | Build time: ${b.buildTime * 12}m</div><div class='small'>Cost: ${costLine(b.cost)}</div>${actionBtn(label, () => sendAction('build', { id }), !!inQueue)}</div>`;
-    }).join('') + '</div>';
-    return;
-  }
-
-  if (state.tab === 'military') {
-    const unitIds = Object.keys(state.meta.units);
-    const defenseIds = ['missile_silo', 'anti_missile_battery', 'wall'];
-
-    let html = '<h3>Military Units</h3><div class="action-grid">';
-    html += unitIds.map((id) => {
-      const u = state.meta.units[id];
-      return `<div class='card'><b>${emojis[id] || ''} ${u.name}</b><div class='small'>Owned: ${you.units[id]}</div><div class='small'>Cost: ${costLine(u.cost)}</div><div class='row'><input id='amt_${id}' value='1' type='number' min='1'/>${actionBtn('Train', () => sendAction('train', { id, amount: Number(document.getElementById(`amt_${id}`).value || 1) }))}</div></div>`;
-    }).join('');
-    html += '</div>';
-
-    html += '<h3>Defenses</h3><div class="action-grid">';
-    html += defenseIds.map((id) => {
-      const b = state.meta.buildings[id];
-      const inQueue = you.buildingQueues.find((q) => q.id === id);
-      const label = inQueue ? `Building... (${Math.ceil(inQueue.ticksRemaining / 5)}m)` : 'Build';
-      return `<div class='card'><b>${emojis[id] || ''} ${b.name}</b><div class='small'>Owned: ${you.buildings[id]} | Build time: ${b.buildTime * 12}m</div><div class='small'>Cost: ${costLine(b.cost)}</div>${actionBtn(label, () => sendAction('build', { id }), !!inQueue)}</div>`;
-    }).join('');
-    html += '</div>';
-
-    html += `<h4>War Room Quick Actions</h4>
-      <div class='row'>${actionBtn('Queue Scout', () => sendAction('scout', {}))}
-      <select id='missileTarget'><option value='economy'>Economy</option><option value='military'>Military</option><option value='support'>Population Centers</option></select>
-      ${actionBtn('Queue Missile', () => sendAction('missile', { target: document.getElementById('missileTarget').value }))}</div>
-      <div class='row' title='Commit: Soldier, Tank, War Ship, Fighter Zed'>🪖<input id='ass_soldier' style='width:50px' type='number' value='5' min='0'/> 🛞<input id='ass_tank' style='width:50px' type='number' value='0' min='0'/> 🚢<input id='ass_war_ship' style='width:50px' type='number' value='0' min='0'/> 🛩️<input id='ass_fighter_zed' style='width:50px' type='number' value='0' min='0'/>${actionBtn('Queue Assault', () => sendAction('assault', { soldier: Number(document.getElementById('ass_soldier').value), tank: Number(document.getElementById('ass_tank').value), war_ship: Number(document.getElementById('ass_war_ship').value), fighter_zed: Number(document.getElementById('ass_fighter_zed').value) }))}</div>`;
-
-    tabContent.innerHTML = html;
-    return;
-  }
-
-  if (state.tab === 'research') {
-    const active = you.research.active;
-    tabContent.innerHTML = `<h3>Research</h3><div class='small'>Active: ${active ? `${state.meta.research[active.id].name} (${Math.ceil(active.ticksRemaining / 5)}m)` : 'None'}</div><div class='action-grid'>` +
-      Object.entries(state.meta.research).map(([id, r]) => {
-        const isCurrent = active?.id === id;
-        const label = isCurrent ? `Researching... (${Math.ceil(active.ticksRemaining / 5)}m)` : 'Start';
-        return `<div class='card'><b>${r.name}</b><div class='small'>Cost: ${costLine(r.cost)} | ${r.years * 12}m</div><div class='small'>Completed: ${you.research.completed.includes(id) ? 'Yes' : 'No'}</div>${actionBtn(label, () => sendAction('research', { id }), !!isCurrent || you.research.completed.includes(id))}</div>`;
-      }).join('') + '</div>';
-    return;
-  }
-
-  if (state.tab === 'war_room') {
-    tabContent.innerHTML = `<h3>War Room</h3>
-    <p>Queue actions now. All resolve at end of year.</p>
-    <div class='row'>${actionBtn('Launch Scout', () => sendAction('scout', {}))}</div>
-    <div class='row'><select id='wrTarget'><option value='economy'>Economy</option><option value='military'>Military</option><option value='support'>Population Centers</option></select>${actionBtn('Launch Missile', () => sendAction('missile', { target: document.getElementById('wrTarget').value }))}</div>
-    <div class='row' title='Commit: Soldier, Tank, War Ship, Fighter Zed'>🪖<input id='wr_soldier' style='width:50px' type='number' value='10' min='0'/> 🛞<input id='wr_tank' style='width:50px' type='number' value='1' min='0'/> 🚢<input id='wr_war_ship' style='width:50px' type='number' value='0' min='0'/> 🛩️<input id='wr_fighter_zed' style='width:50px' type='number' value='0' min='0'/>${actionBtn('Commit Assault', () => sendAction('assault', { soldier: Number(document.getElementById('wr_soldier').value), tank: Number(document.getElementById('wr_tank').value), war_ship: Number(document.getElementById('wr_war_ship').value), fighter_zed: Number(document.getElementById('wr_fighter_zed').value) }))}</div>`;
-  }
+  if (!state.game?.you) return;
+  if (state.tab === 'dashboard') return renderDashboard();
+  if (state.tab === 'economy' || state.tab === 'buildings') return renderEconomyOrBuildings();
+  if (state.tab === 'military') return renderMilitary();
+  if (state.tab === 'research') return renderResearch();
+  if (state.tab === 'war_room') return renderWarRoom();
 }
 
 async function sendAction(type, payload) {
   try {
     await api('/api/action', { roomId: state.roomId, playerId: state.playerId, type, payload });
-  } catch (e) {
-    // Errors are now logged to the Event Log via server-side appendEvent
+    setNotice(null);
+  } catch (error) {
+    setNotice(error.message, 'error');
   }
 }
 
 function drawTabs() {
-  tabsEl.innerHTML = tabs.map((t) => `<button class='tab ${state.tab === t ? 'active' : ''}' data-tab='${t}'>${t.replace('_', ' ')}</button>`).join('');
-  tabsEl.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { state.tab = b.dataset.tab; drawTabs(); renderTab(); }));
+  tabsEl.innerHTML = tabs.map((tab) => `<button class="tab ${state.tab === tab ? 'active' : ''}" data-tab="${tab}">${tab.replace('_', ' ')}</button>`).join('');
+  tabsEl.querySelectorAll('button').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.tab = button.dataset.tab;
+      drawTabs();
+      renderTab();
+    });
+  });
 }
 
 function renderAll() {
+  renderStatusBanner();
   if (!state.game) return;
-  document.getElementById('gameLayout').classList.remove('hidden');
+  gameLayoutEl.classList.remove('hidden');
   renderTopBar();
   renderEvents();
   renderChat();
   renderIntel();
   drawTabs();
   renderTab();
-  if (state.game.winner) {
-    const won = state.game.winner === state.playerId;
-    alert(won ? 'Victory!' : 'Defeat!');
-  }
 }
 
 function applyGameState(game) {
   state.game = game;
   state.lastStateAt = Date.now();
+  if (game?.you?.name) nameEl.value = game.you.name;
+  saveSession();
   if (!state.game?.opponent?.name) {
     roomInfoEl.textContent = `Room ${state.roomId}. Share this 4-digit code with your opponent.`;
   } else {
-    document.getElementById('setup').classList.add('hidden');
-    roomInfoEl.textContent = '';
+    setupEl.classList.add('hidden');
+    roomInfoEl.textContent = `Room ${state.roomId}`;
   }
   renderAll();
 }
@@ -203,32 +546,71 @@ function startPollingFallback() {
     if (!state.roomId || !state.playerId) return;
     if (Date.now() - state.lastStateAt < 4_000) return;
     try {
+      state.connection = state.connection === 'live' ? 'live' : 'polling';
       const game = await api(`/api/state?roomId=${state.roomId}&playerId=${state.playerId}`);
       applyGameState(game);
-    } catch (_) {}
+      renderStatusBanner();
+    } catch (_) {
+      state.connection = 'offline';
+      renderStatusBanner();
+    }
   }, 2_000);
 }
 
-async function connectStream() {
+function connectStream() {
+  closeStream();
+  state.connection = 'polling';
+  renderStatusBanner();
   const es = new EventSource(`${API_ORIGIN}/api/stream?roomId=${state.roomId}&playerId=${state.playerId}`);
-  es.addEventListener('state', (evt) => {
-    applyGameState(JSON.parse(evt.data));
+  state.es = es;
+  es.addEventListener('state', (event) => {
+    state.connection = 'live';
+    applyGameState(JSON.parse(event.data));
+    renderStatusBanner();
+  });
+  es.addEventListener('error', () => {
+    state.connection = 'polling';
+    renderStatusBanner();
   });
   startPollingFallback();
 }
 
+async function restoreSession() {
+  const session = readSession();
+  if (!session?.roomId || !session?.reconnectToken) return;
+  state.connection = 'restoring';
+  renderStatusBanner();
+  try {
+    await ensureMeta();
+    const data = await api('/api/room/reconnect', { roomId: session.roomId, reconnectToken: session.reconnectToken });
+    state.roomId = data.roomId;
+    state.playerId = data.playerId;
+    state.reconnectToken = data.reconnectToken;
+    if (session.name) nameEl.value = session.name;
+    setupEl.classList.add('hidden');
+    connectStream();
+    setNotice('Session restored.', 'success');
+  } catch (_) {
+    clearSession();
+    state.connection = 'idle';
+    renderStatusBanner();
+  }
+}
+
 document.getElementById('createBtn').addEventListener('click', async () => {
   try {
-    state.meta = await api('/api/meta');
-    const name = document.getElementById('name').value;
+    await ensureMeta();
+    const name = nameEl.value.trim() || 'Commander';
     const data = await api('/api/room/create', { name });
     state.roomId = data.roomId;
     state.playerId = data.playerId;
+    state.reconnectToken = data.reconnectToken;
     joinFlowEl.classList.add('hidden');
-    roomInfoEl.textContent = `Game created! Your 4-digit code is ${state.roomId}.`;
+    roomInfoEl.textContent = `Game created. Your 4-digit code is ${state.roomId}.`;
+    saveSession();
     connectStream();
-  } catch (e) {
-    alert(e.message);
+  } catch (error) {
+    setNotice(error.message, 'error');
   }
 });
 
@@ -239,31 +621,43 @@ document.getElementById('joinBtn').addEventListener('click', () => {
 
 document.getElementById('joinConfirmBtn').addEventListener('click', async () => {
   try {
-    state.meta = await api('/api/meta');
-    const name = document.getElementById('name').value;
+    await ensureMeta();
+    const name = nameEl.value.trim() || 'Commander';
     const roomId = roomInputEl.value.trim();
     if (!/^\d{4}$/.test(roomId)) {
-      alert('Please enter a valid 4-digit room code.');
+      setNotice('Please enter a valid 4-digit room code.', 'error');
       return;
     }
     const data = await api('/api/room/join', { roomId, name });
     state.roomId = data.roomId;
     state.playerId = data.playerId;
+    state.reconnectToken = data.reconnectToken;
     roomInfoEl.textContent = `Joined room ${state.roomId}.`;
+    saveSession();
     connectStream();
-  } catch (e) {
-    alert(e.message);
+  } catch (error) {
+    setNotice(error.message, 'error');
   }
 });
 
-roomInputEl.addEventListener('keydown', (evt) => {
-  if (evt.key === 'Enter') document.getElementById('joinConfirmBtn').click();
+roomInputEl.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') document.getElementById('joinConfirmBtn').click();
 });
 
 document.getElementById('sendChat').addEventListener('click', async () => {
-  const text = document.getElementById('chatInput').value;
-  document.getElementById('chatInput').value = '';
+  const text = chatInputEl.value.trim();
+  if (!text) return;
+  chatInputEl.value = '';
   await sendAction('chat', { text });
 });
 
+chatInputEl.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    document.getElementById('sendChat').click();
+  }
+});
+
 setInterval(() => state.game && renderTopBar(), 1000);
+
+ensureMeta().then(() => restoreSession());

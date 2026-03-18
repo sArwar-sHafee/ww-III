@@ -6,22 +6,12 @@ ww-III: Real-Time Resource Warfare (2-Player Edition)
 **Version**  
 1.0 (Text-Only Web Implementation)
 
-**Current Implementation Status**  
-This repository currently ships a playable prototype of the core multiplayer loop rather than the full design spec below. The live implementation uses SSE for updates, supports session recovery in-browser, exposes queued war actions in the UI, and includes inline action validation. Advanced systems described later in this document, such as worker assignment and nuclear strikes, are not fully implemented yet.
-
 **Overview**  
 ww-III is a fully text-based, real-time strategy war game for exactly two players. One player creates a game room and receives a unique 4-digit code. The second player enters that code to join. The game begins immediately when both players are connected.  
 
-Each game year currently lasts exactly 60 seconds of real time in the shipped build. All actions, production, consumption, and combat resolve simultaneously for both players at the end of every year. The game continues until one player meets a victory condition or the other surrenders.  
+Each game year lasts exactly 30 seconds of real time. All actions, production, consumption, and combat resolve simultaneously for both players at the end of every year. The game continues until one player meets a victory condition or the other surrenders.  
 
 The interface uses only HTML text, emojis, and optional small animated GIFs for visual feedback. No maps or graphics are used.
-
-
-**Deployment Note (Render)**  
-This game uses long-lived streaming connections (SSE) for live updates, which do not run reliably on Vercel serverless functions. Deploy on Render instead.  
-- Live URL: https://ww-iii.onrender.com  
-- Render service id: `srv-d6s4054hg0os73evlk5g`  
-- Render blueprint file: `render.yaml` (included in this repo).  
 
 **Game Setup**  
 1. Player 1 clicks “Create Game”. The server generates a random 4-digit code and creates a private room.  
@@ -36,17 +26,17 @@ All game state is stored on the server. Disconnecting does not end the game; the
 - Year: 0  
 - Population: 10 (maximum capacity: 10)  
 - Resources:  
-  - Nutrition: 200  
-  - Lumber: 150  
-  - Steel: 100  
-  - Alloy: 50  
-  - Oil: 20  
-  - Magnet: 20  
-  - Electricity: 20  
-  - Glass: 20  
-  - Plastic: 20  
-  - Concrete: 20  
-  - Silicon: 20  
+  - Nutrition: 50  
+  - Lumber: 30  
+  - Steel: 20  
+  - Alloy: 10  
+  - Oil: 0  
+  - Magnet: 0  
+  - Electricity: 0  
+  - Glass: 0  
+  - Plastic: 0  
+  - Concrete: 0  
+  - Silicon: 0  
 
 **Core Mechanics – The Year Tick**  
 Every 30 seconds the server performs the following steps in exact order for both players:  
@@ -113,8 +103,6 @@ All buildings take 1–3 years to complete once started. Only one of each type c
 - Barracks: Enables soldier training. Cost: 30 lumber, 20 steel. Build time: 2 years.  
 - Factory: +20% production to all resource buildings when workers assigned. Cost: 40 steel, 25 alloy, 10 oil. Build time: 3 years. Requires Electricity research.  
 - Radar Station: Increases scout accuracy and duration. Cost: 20 steel, 15 alloy, 10 magnet. Build time: 2 years. Requires Advanced Scouting research.  
-- Dry Dock: Enables war ship training. Cost: 40 steel, 25 alloy, 15 oil. Build time: 3 years. Requires Naval Warfare research.
-- Airfield: Enables fighter zed training. Cost: 30 steel, 25 alloy, 10 silicon. Build time: 3 years. Requires Aerial Warfare research.
 
 **Military Buildings** (Military tab)  
 - Missile Silo: Enables missile launches. Cost: 35 steel, 20 oil, 15 alloy. Build time: 3 years. Requires Guided Missiles research. Capacity: 3 missiles stored.  
@@ -124,8 +112,6 @@ All buildings take 1–3 years to complete once started. Only one of each type c
 **Units** (Military tab)  
 - Soldier: Cost: 8 nutrition, 4 steel. Upkeep: 0.5 nutrition per year. Attack power: 10.  
 - Tank: Cost: 12 steel, 8 oil. Upkeep: 1 nutrition + 0.5 oil per year. Attack power: 25. Requires Tanks research.  
-- War Ship: Cost: 30 steel, 20 oil, 15 alloy. Upkeep: 2 nutrition + 1 oil per year. Attack power: 50. Requires Naval Warfare research and Dry Dock.
-- Fighter Zed: Cost: 20 alloy, 15 oil, 10 silicon. Upkeep: 1.5 nutrition + 1 oil + 1 electricity per year. Attack power: 40. Requires Aerial Warfare research and Airfield.
 - Scout Drone: Cost: 5 oil, 3 electricity. Upkeep: 1 electricity per year. Reveals exact opponent buildings and resources for 2 years. Cooldown: 1 year.  
 
 **Research Tree** (Research tab)  
@@ -145,8 +131,6 @@ Tier 3
 - Advanced Scouting: Improves scout drone accuracy. Cost: 25 alloy, 10 magnet. Time: 2 years.  
 - Plastics: Unlocks Plastics Plant. Cost: 30 alloy, 10 oil. Time: 3 years.  
 - Industrial Materials: Unlocks Concrete Plant. Cost: 20 alloy, 5 steel, 5 electricity. Time: 2 years.  
-- Naval Warfare: Unlocks war ship training. Cost: 50 alloy, 25 magnet. Time: 4 years.
-- Aerial Warfare: Unlocks fighter zed training. Cost: 50 alloy, 25 silicon. Time: 4 years.
 
 Tier 4 (End-game)  
 - Nuclear Technology: Unlocks Nuke in War Room. Cost: 100 alloy, 50 magnet, 30 electricity. Time: 5 years.  
@@ -164,9 +148,9 @@ Tier 4 (End-game)
 - Anti-Missile Battery has 35% intercept chance per battery.  
 
 **Ground Assaults**  
-- Select number of soldiers, tanks, war ships, and fighter zeds to commit.
-- Attacker strength = (soldiers × 10) + (tanks × 25) + (war_ships × 50) + (fighter_zeds × 40).
-- Defender strength = (remaining soldiers × 5) + (tanks × 12) + (war_ships × 25) + (fighter_zeds × 20) + (Wall bonus).
+- Select number of soldiers and tanks to commit.  
+- Attacker strength = (soldiers × 10) + (tanks × 25).  
+- Defender strength = (remaining soldiers × 5) + (tanks × 12) + (Wall bonus).  
 - Winner loses 30% of committed forces; loser loses 70% of committed forces plus 1–2 random buildings.  
 - Attacker steals 10–20% of one random resource type if victorious.  
 

@@ -11,22 +11,23 @@
     <header>
       <h1>ww-III: Real-Time Resource Warfare</h1>
       <div id="setup">
-        <input id="name" placeholder="Your name" value="Commander" />
+        <input id="name" placeholder="Your name" value="Commander" aria-label="Player name" />
         <button id="createBtn">Create Game</button>
         <button id="joinBtn">Join Game</button>
         <div id="joinFlow" class="hidden">
-          <input id="roomInput" placeholder="Enter 4-digit room code" maxlength="4" inputmode="numeric" />
+          <input id="roomInput" placeholder="Enter 4-digit room code" maxlength="4" inputmode="numeric" aria-label="Room code" />
           <button id="joinConfirmBtn">Connect</button>
         </div>
       </div>
       <div id="roomInfo"></div>
+      <div id="statusBanner" class="status hidden"></div>
       <div id="topBar"></div>
     </header>
 
     <main class="layout hidden" id="gameLayout">
       <section class="left">
         <div class="panel"><h3>Event Log</h3><ul id="events"></ul></div>
-        <div class="panel"><h3>Chat</h3><div id="chat"></div><div class="row"><input id="chatInput" placeholder="Type... /surrender"/><button id="sendChat">Send</button></div></div>
+        <div class="panel"><h3>Chat</h3><div id="chat"></div><div class="row"><input id="chatInput" placeholder="Type... /surrender" aria-label="Chat message"/><button id="sendChat">Send</button></div></div>
       </section>
 
       <section class="center">
