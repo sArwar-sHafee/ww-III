@@ -74,25 +74,27 @@ Resources are displayed in the top bar with current total and net change for the
 
 **User Interface Layout**  
 - **Top Bar** (always visible):  
-  Year number | Population (current/max) | Net nutrition change | All resources with emojis and net change (red when negative, yellow when depleted or capped). See `docs/ui/emoji-map.md` for the full emoji set.  
+  Removed in the current UI to free vertical space for the main panels.  
 
 - **Left Panel**: Event Log  
-  Displays the last 10 important events in chronological order (missile impacts, scout detections, battles, building completions, population deaths, etc.). New events push older ones down. This panel is intentionally taller than chat so more history stays visible.  
+  Displays the last 10 important events in chronological order (missile impacts, scout detections, battles, building completions, population deaths, etc.). New events push older ones down. Scouted opponent intel is also surfaced here as blinking red log entries. This panel is intentionally taller than chat so more history stays visible.  
 
-- **Upper Right Panel**: Chat  
-  Real-time chat between the two players. Messages appear instantly in a slightly smaller fixed-height scrollable panel. No commands except “/surrender” which instantly ends the game in the opponent’s favor.  
+- **Lower Left Panel**: Chat  
+  Real-time chat between the two players. Messages appear instantly in a fixed-height scrollable panel below the event log. No commands except “/surrender” which instantly ends the game in the opponent’s favor.  
 
-- **Lower Right Panel**: Opponent Intel  
-  Shows only scouted information (buildings and approximate resource levels). Updates only when new scouting data arrives, and sits directly below chat without a large empty gap.  
+- **Right Panel**: Command Summary  
+  Always-visible summary tables for year/month/timer, resources, buildings, units, and defences. This panel scrolls independently from the center content area.  
 
 - **Main Area**: Seven tabs (click to switch)  
-  1. Dashboard (overview numbers, surrender button, queued actions, and summary tables)  
+  1. Dashboard (overview numbers, surrender button, and queued actions)  
   2. Economy (resource buildings only)  
   3. Buildings (support buildings only)  
   4. Military (train military units only)  
   5. Defences (build defensive structures only)  
   6. Research (tech tree with progress bars)  
   7. War Room (queued actions, scout, launch missiles, commit ground assaults)
+
+The page itself is fixed-height in the desktop layout. The left column, center content area, and right summary panel scroll independently.
 
 **Buildings**  
 All buildings currently take 1–3 months to complete in the shipped prototype. Only one of each type can be built per category unless specified. Workers can be assigned to speed production.  

@@ -21,12 +21,12 @@
       </div>
       <div id="roomInfo"></div>
       <div id="statusBanner" class="status hidden"></div>
-      <div id="topBar"></div>
     </header>
 
     <main class="layout hidden" id="gameLayout">
       <section class="left">
-        <div class="panel"><h3>Event Log</h3><ul id="events"></ul></div>
+        <div class="panel event-panel"><h3>Event Log</h3><ul id="events"></ul></div>
+        <div class="panel chat-panel"><h3>Chat</h3><div id="chat"></div><div class="row"><input id="chatInput" placeholder="Type... /surrender" aria-label="Chat message"/><button id="sendChat">Send</button></div></div>
       </section>
 
       <section class="center">
@@ -35,8 +35,7 @@
       </section>
 
       <section class="right">
-        <div class="panel chat-panel"><h3>Chat</h3><div id="chat"></div><div class="row"><input id="chatInput" placeholder="Type... /surrender" aria-label="Chat message"/><button id="sendChat">Send</button></div></div>
-        <div class="panel intel-panel"><h3>Opponent Intel</h3><pre id="intel"></pre></div>
+        <div class="panel summary-panel" id="sidebarContent"></div>
       </section>
     </main>
   </div>

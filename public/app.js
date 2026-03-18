@@ -30,10 +30,8 @@ const emojis = {
 };
 const tabs = ['dashboard', 'economy', 'buildings', 'military', 'defences', 'research', 'war_room'];
 
-const topBar = document.getElementById('topBar');
 const eventsEl = document.getElementById('events');
 const chatEl = document.getElementById('chat');
-const intelEl = document.getElementById('intel');
 const tabContent = document.getElementById('tabContent');
 const tabsEl = document.getElementById('tabs');
 const roomInfoEl = document.getElementById('roomInfo');
@@ -44,6 +42,7 @@ const setupEl = document.getElementById('setup');
 const gameLayoutEl = document.getElementById('gameLayout');
 const nameEl = document.getElementById('name');
 const chatInputEl = document.getElementById('chatInput');
+const sidebarContentEl = document.getElementById('sidebarContent');
 
 async function api(path, body) {
   const res = await fetch(`${API_ORIGIN}${path}`, {
@@ -275,51 +274,29 @@ function getResourceStateClass(value, net) {
   return '';
 }
 
-function renderTopBar() {
-  if (!state.game || !state.meta) return;
-  const you = state.game.you;
-  const items = [
-    `<span>📅 Year ${state.game.year}, Month ${state.game.month}</span>`,
-    `<span>👥 Pop: ${you.population}/${you.populationMax}</span>`,
-    `<span>🎯 ${getPhaseLabel()}</span>`
-  ];
+function renderEvents() {
+  const events = [...(state.game?.you.eventLog || [])].map((event) => ({
+    cls: event.type || '',
+    text: `[Y${event.year}] ${event.message}`
+  }));
 
-  for (const resource of state.meta.resources) {
-    const value = Math.floor(you.resources[resource]);
-    const net = you.net?.[resource] ?? 0;
-    const cls = getResourceStateClass(value, net);
-    items.push(`<span class="${cls}">${emojis[resource]} ${resource}: <b>${value}</b> <small>(${formatDelta(net)})</small></span>`);
+  const intel = state.game?.opponent?.intel;
+  if (intel?.known) {
+    events.unshift({ cls: 'error blink', text: `[INTEL] Expires Year ${intel.expiresAt}` });
+    for (const [key, value] of Object.entries(intel.buildings || {}).filter(([, amount]) => amount > 0)) {
+      events.unshift({ cls: 'error blink', text: `[INTEL] ${emojis[key] || ''} ${key.replace(/_/g, ' ')}: ${value}` });
+    }
+    for (const [key, value] of Object.entries(intel.resources || {}).filter(([, amount]) => amount > 0)) {
+      events.unshift({ cls: 'error blink', text: `[INTEL] ${emojis[key] || ''} ${key}: ${Math.floor(value)}` });
+    }
   }
 
-  const countdown = state.game.phase === 'countdown' ? `${getCountdownSeconds()}s to start` : `${getCountdownSeconds()}s`;
-  topBar.innerHTML = items.join('') + `<span>⏱️ ${countdown}</span>`;
-}
-
-function renderEvents() {
-  eventsEl.innerHTML = (state.game?.you.eventLog || []).map((event) => `<li class="${event.type || ''}">[Y${event.year}] ${event.message}</li>`).join('');
+  eventsEl.innerHTML = events.map((event) => `<li class="${event.cls}">${event.text}</li>`).join('');
 }
 
 function renderChat() {
   chatEl.innerHTML = (state.game?.you.chat || []).map((message) => `<div>[Y${message.year}] <b>${message.from}</b>: ${message.text}</div>`).join('');
   chatEl.scrollTop = chatEl.scrollHeight;
-}
-
-function formatIntelSection(title, data) {
-  const rows = Object.entries(data)
-    .filter(([, value]) => value > 0)
-    .sort((a, b) => b[1] - a[1])
-    .map(([key, value]) => `${emojis[key] || ''} ${key.replace(/_/g, ' ')}: ${Math.floor(value)}`);
-  return `${title}\n${rows.length ? rows.join('\n') : 'No known assets.'}`;
-}
-
-function renderIntel() {
-  const intel = state.game?.opponent?.intel;
-  if (!intel?.known) {
-    intelEl.textContent = 'No active scouting intel.';
-    return;
-  }
-
-  intelEl.textContent = `Intel expires at Year ${intel.expiresAt}\n\n${formatIntelSection('Buildings', intel.buildings)}\n\n${formatIntelSection('Approx Resources', intel.resources)}`;
 }
 
 function costLine(cost) {
@@ -468,7 +445,6 @@ function renderDashboard() {
       </div>
     </div>
     ${renderPendingActions()}
-    ${renderSummaryTables()}
   `;
 }
 
@@ -544,8 +520,9 @@ function renderDefences() {
   `;
 }
 
-function renderSummaryTables() {
+function renderSidebar() {
   const you = state.game.you;
+  const countdown = state.game.phase === 'countdown' ? `${getCountdownSeconds()}s to start` : `${getCountdownSeconds()}s`;
   const resourceRows = state.meta.resources.map((resource) => {
     const value = Math.floor(you.resources[resource]);
     const net = you.net?.[resource] ?? 0;
@@ -557,11 +534,20 @@ function renderSummaryTables() {
     <tr><td>${emojis[id] || ''} ${building.name}</td><td>${building.category}</td><td>${you.buildings[id]}</td></tr>
   `).join('');
 
+  const defenceRows = ['missile_silo', 'anti_missile_battery', 'wall'].map((id) => `
+    <tr><td>${emojis[id] || ''} ${state.meta.buildings[id].name}</td><td>${you.buildings[id]}</td></tr>
+  `).join('');
+
   const unitRows = Object.entries(state.meta.units).map(([id, unit]) => `
     <tr><td>${emojis[id] || ''} ${unit.name}</td><td>${you.units[id]}</td></tr>
   `).join('');
 
-  return `
+  sidebarContentEl.innerHTML = `
+    <h3>Command Summary</h3>
+    <div class="small">📅 Year ${state.game.year}, Month ${state.game.month}</div>
+    <div class="small">⏱️ ${countdown}</div>
+    <div class="small">👥 Population ${you.population}/${you.populationMax}</div>
+    <div class="small">🎯 ${getPhaseLabel()}</div>
     <div class="split-panels">
       <div class="panel inset">
         <h3>Resources</h3>
@@ -582,6 +568,13 @@ function renderSummaryTables() {
         <table class="data-table">
           <thead><tr><th>Unit</th><th>Owned</th></tr></thead>
           <tbody>${unitRows}</tbody>
+        </table>
+      </div>
+      <div class="panel inset">
+        <h3>Defences</h3>
+        <table class="data-table">
+          <thead><tr><th>Defence</th><th>Owned</th></tr></thead>
+          <tbody>${defenceRows}</tbody>
         </table>
       </div>
     </div>
@@ -679,10 +672,9 @@ function renderAll() {
   renderStatusBanner();
   if (!state.game) return;
   gameLayoutEl.classList.remove('hidden');
-  renderTopBar();
   renderEvents();
   renderChat();
-  renderIntel();
+  renderSidebar();
   const nextSignature = getTabSignature(state.game);
   if (!tabsEl.children.length) drawTabs();
   if (state.forceTabRefresh || state.lastTabSignature !== nextSignature) {
@@ -829,6 +821,6 @@ chatInputEl.addEventListener('keydown', (event) => {
   }
 });
 
-setInterval(() => state.game && renderTopBar(), 1000);
+setInterval(() => state.game && renderSidebar(), 1000);
 
 ensureMeta().then(() => restoreSession());
