@@ -12,7 +12,9 @@ const state = {
   es: null,
   connection: 'idle',
   notice: null,
-  noticeTimer: null
+  noticeTimer: null,
+  lastTabSignature: null,
+  warRoomDraft: { soldier: 10, tank: 1, war_ship: 0, fighter_zed: 0 }
 };
 
 const DEFAULT_API_ORIGIN = 'https://ww-iii.onrender.com';
@@ -168,6 +170,74 @@ function formatDelta(value) {
 
 function ticksToMonths(ticks) {
   return Math.max(1, Math.ceil(ticks / (state.meta?.ticksPerMonth || 5)));
+}
+
+function flooredResources(resources = {}) {
+  return Object.fromEntries(Object.entries(resources).map(([key, value]) => [key, Math.floor(value)]));
+}
+
+function getTabSignature(game) {
+  if (!game) return '';
+  const { you, opponent, phase, winner, year } = game;
+
+  if (state.tab === 'dashboard') {
+    return JSON.stringify({
+      phase,
+      winner,
+      opponent: opponent?.name || '',
+      pending: you.pending,
+      connection: state.connection
+    });
+  }
+
+  if (state.tab === 'economy' || state.tab === 'buildings') {
+    return JSON.stringify({
+      phase,
+      buildings: you.buildings,
+      buildingQueues: you.buildingQueues,
+      research: you.research.completed,
+      resources: flooredResources(you.resources)
+    });
+  }
+
+  if (state.tab === 'military') {
+    return JSON.stringify({
+      phase,
+      units: you.units,
+      buildings: you.buildings,
+      buildingQueues: you.buildingQueues,
+      research: you.research.completed,
+      resources: flooredResources(you.resources)
+    });
+  }
+
+  if (state.tab === 'research') {
+    return JSON.stringify({
+      phase,
+      year,
+      active: you.research.active,
+      completed: you.research.completed,
+      resources: flooredResources(you.resources)
+    });
+  }
+
+  if (state.tab === 'war_room') {
+    return JSON.stringify({
+      phase,
+      year,
+      pending: you.pending,
+      units: you.units,
+      buildings: { missile_silo: you.buildings.missile_silo },
+      cooldown: you.scoutCooldownUntil,
+      resources: flooredResources(you.resources)
+    });
+  }
+
+  return JSON.stringify({ phase, year });
+}
+
+function updateWarRoomDraft(field, value) {
+  state.warRoomDraft[field] = Math.max(0, Number(value || 0));
 }
 
 function renderTopBar() {
@@ -470,10 +540,10 @@ function renderWarRoom() {
         ${actionBtn('Launch Missile', () => sendAction('missile', { target: document.getElementById('wrTarget').value }), { disabled: missileState.disabled, title: missileState.reasons.join(' | ') })}
       </div>
       <div class="row compact" title="Commit: Soldier, Tank, War Ship, Fighter Zed">
-        🪖<input id="wr_soldier" type="number" value="10" min="0" />
-        🛞<input id="wr_tank" type="number" value="1" min="0" />
-        🚢<input id="wr_war_ship" type="number" value="0" min="0" />
-        🛩️<input id="wr_fighter_zed" type="number" value="0" min="0" />
+        🪖<input id="wr_soldier" type="number" value="${state.warRoomDraft.soldier}" min="0" />
+        🛞<input id="wr_tank" type="number" value="${state.warRoomDraft.tank}" min="0" />
+        🚢<input id="wr_war_ship" type="number" value="${state.warRoomDraft.war_ship}" min="0" />
+        🛩️<input id="wr_fighter_zed" type="number" value="${state.warRoomDraft.fighter_zed}" min="0" />
         ${actionBtn('Commit Assault', () => sendAction('assault', {
           soldier: Number(document.getElementById('wr_soldier').value),
           tank: Number(document.getElementById('wr_tank').value),
@@ -482,6 +552,11 @@ function renderWarRoom() {
         }), { disabled: state.game.phase !== 'active', title: state.game.phase !== 'active' ? 'Match not active' : '' })}
       </div>
     </div>`;
+
+  ['soldier', 'tank', 'war_ship', 'fighter_zed'].forEach((field) => {
+    const input = document.getElementById(`wr_${field}`);
+    input?.addEventListener('input', (event) => updateWarRoomDraft(field, event.target.value));
+  });
 }
 
 function renderTab() {
@@ -507,6 +582,7 @@ function drawTabs() {
   tabsEl.querySelectorAll('button').forEach((button) => {
     button.addEventListener('click', () => {
       state.tab = button.dataset.tab;
+      state.lastTabSignature = null;
       setNotice(null);
       drawTabs();
       renderTab();
@@ -522,8 +598,12 @@ function renderAll() {
   renderEvents();
   renderChat();
   renderIntel();
-  drawTabs();
-  renderTab();
+  const nextSignature = getTabSignature(state.game);
+  if (!tabsEl.children.length) drawTabs();
+  if (state.lastTabSignature !== nextSignature) {
+    renderTab();
+    state.lastTabSignature = nextSignature;
+  }
 }
 
 function applyGameState(game) {
@@ -533,6 +613,7 @@ function applyGameState(game) {
   if (state.game?.phase === 'finished') {
     clearSession();
     setupEl.classList.remove('hidden');
+    state.lastTabSignature = null;
   } else {
     saveSession();
   }
