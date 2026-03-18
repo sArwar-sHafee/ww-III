@@ -446,17 +446,26 @@ button:disabled {
   }
 
   .layout {
+    display: flex;
+    flex-direction: column;
     gap: 0.75rem;
     padding: 0.75rem;
+  }
+
+  .left,
+  .center,
+  .right {
+    width: 100%;
   }
 
   .tabs {
     gap: 0.4rem;
     margin-bottom: 0.75rem;
+    margin-top: 0.25rem;
   }
 
   .tab {
-    flex: 1 1 calc(50% - 0.4rem);
+    flex: 1 1 100%;
     text-align: center;
     padding: 8px 10px;
     font-size: 0.82rem;
@@ -527,5 +536,9 @@ button:disabled {
 
   .summary-panel {
     min-height: 240px;
+  }
+
+  .center {
+    margin-top: 0.25rem;
   }
 }
