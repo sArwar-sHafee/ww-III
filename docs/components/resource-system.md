@@ -4,13 +4,14 @@
 Track resource amounts, apply production and consumption, enforce storage capacity and zero-flooring.
 
 ## Resources
-`nutrition`, `lumber`, `steel`, `alloy`, `oil`, `magnet`, `electricity`, `glass`, `plastic`, `concrete`, `silicon`
+`nutrition`, `lumber`, `steel`, `alloy`, `oil`, `magnet`, `electricity`, `glass`, `polymer`, `concrete`, `silicon`
 
 ## Inputs
 - Building production outputs
 - Unit upkeep consumption
 - Population consumption
 - Combat loot
+- Trade actions
 
 ## Outputs
 - Updated resource totals

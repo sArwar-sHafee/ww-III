@@ -1,5 +1,4 @@
 const SESSION_KEY = 'wwiii_session_v2';
-const MISSILE_COST = { steel: 8, oil: 6, electricity: 3 };
 const state = {
   roomId: null,
   playerId: null,
@@ -16,19 +15,32 @@ const state = {
   lastTabSignature: null,
   forceTabRefresh: false,
   unitDrafts: {},
-  warRoomDraft: { soldier: 10, tank: 1, war_ship: 0, fighter_zed: 0 }
+  tradeDrafts: {},
+  selectedMissile: 'ballistic_missile',
+  warRoomDraft: {}
 };
 
 const DEFAULT_API_ORIGIN = 'https://ww-iii.onrender.com';
 const API_ORIGIN = window.WWIII_API_ORIGIN || (window.location.hostname.endsWith('.vercel.app') ? DEFAULT_API_ORIGIN : '');
 const emojis = {
-  nutrition: '🍲', lumber: '🪵', steel: '🔩', alloy: '🪙', oil: '🛢️', magnet: '🧲', electricity: '⚡', glass: '🪟', plastic: '♻️', concrete: '🧱', silicon: '💾',
-  farm: '🌾', lumber_camp: '🪓', steel_mill: '🏭', alloy_quarry: '⛏️', oil_rig: '🛢️', magnet_extractor: '🧲', power_plant: '⚡', glassworks: '🪟', plastics_plant: '🧪', concrete_plant: '🧱', silicon_refinery: '💾',
-  house: '🏠', barracks: '🪖', factory: '🏭', radar_station: '📡', dry_dock: '⚓', airfield: '🛫',
-  missile_silo: '🚀', anti_missile_battery: '🛡️', wall: '🧱',
-  soldier: '🪖', tank: '🛞', war_ship: '🚢', fighter_zed: '🛩️', scout_drone: '🛰️'
+  credits: '💳',
+  nutrition: '🍲', lumber: '🪵', steel: '🔩', alloy: '🪙', oil: '🛢️', magnet: '🧲', electricity: '⚡', glass: '🪟', polymer: '♻️', concrete: '🧱', silicon: '💾',
+  farm: '🌾', lumber_camp: '🪓', steel_mill: '🏭', alloy_quarry: '⛏️', oil_rig: '🛢️', magnet_extractor: '🧲', power_plant: '⚡', glassworks: '🪟', polymer_plant: '🧪', concrete_plant: '🧱', silicon_refinery: '💾',
+  shelter: '🏠', barracks: '🪖', factory: '🏭', radar_station: '📡', dry_dock: '⚓', airfield: '🛫',
+  anti_missile_battery: '🛡️', land_mine: '💣',
+  infantry: '🪖', special_force: '🎖️', tank: '🛞', war_ship: '🚢', submarine: '🚤', fighter_zed: '🛩️', attack_helicopter: '🚁', combat_drone: '🤖', ballistic_missile: '🚀', cruise_missile: '🛰️', scout_drone: '📡', anti_tank_squad: '🧨', naval_strike_missile: '🚀', air_defence_gun: '🎯'
 };
-const tabs = ['dashboard', 'economy', 'buildings', 'military', 'defences', 'research', 'war_room'];
+const tabs = ['dashboard', 'economy', 'trade', 'supports', 'military', 'defences', 'research', 'war_room'];
+const tabLabels = {
+  dashboard: 'Dashboard',
+  economy: 'Economy',
+  trade: 'Trade',
+  supports: 'Supports',
+  military: 'Military',
+  defences: 'Defences',
+  research: 'Research',
+  war_room: 'War Room'
+};
 
 const eventsEl = document.getElementById('events');
 const chatEl = document.getElementById('chat');
@@ -191,9 +203,10 @@ function getTabSignature(game) {
     });
   }
 
-  if (state.tab === 'economy' || state.tab === 'buildings') {
+  if (state.tab === 'economy' || state.tab === 'supports' || state.tab === 'trade') {
     return JSON.stringify({
       phase,
+      credits: you.credits,
       buildings: you.buildings,
       buildingQueues: you.buildingQueues,
       research: you.research.completed,
@@ -238,7 +251,7 @@ function getTabSignature(game) {
       year,
       pending: you.pending,
       units: you.units,
-      buildings: { missile_silo: you.buildings.missile_silo },
+      research: you.research.completed,
       cooldown: you.scoutCooldownUntil,
       resources: flooredResources(you.resources)
     });
@@ -250,6 +263,16 @@ function getTabSignature(game) {
 function updateWarRoomDraft(field, value) {
   const max = state.game?.you?.units?.[field] ?? Infinity;
   state.warRoomDraft[field] = Math.max(0, Math.min(Number(value || 0), max));
+}
+
+function getTradeDraft(resource) {
+  return Math.max(1, Number(state.tradeDrafts[resource] || 1));
+}
+
+function adjustTradeDraft(resource, delta) {
+  state.tradeDrafts[resource] = Math.max(1, getTradeDraft(resource) + delta);
+  state.forceTabRefresh = true;
+  renderAll();
 }
 
 function getUnitDraft(id) {
@@ -266,6 +289,18 @@ function adjustWarRoomDraft(field, delta) {
   updateWarRoomDraft(field, state.warRoomDraft[field] + delta);
   state.forceTabRefresh = true;
   renderAll();
+}
+
+function getAssaultUnits() {
+  return Object.entries(state.meta?.units || {}).filter(([, unit]) => unit.assault);
+}
+
+function getMilitaryUnits() {
+  return Object.entries(state.meta?.units || {}).filter(([, unit]) => unit.section === 'military');
+}
+
+function getDefenceUnits() {
+  return Object.entries(state.meta?.units || {}).filter(([, unit]) => unit.section === 'defence');
 }
 
 function getResourceStateClass(value, net) {
@@ -340,7 +375,7 @@ function getUnitCardState(id, amount = 1) {
   const unit = state.meta.units[id];
   const reasons = [];
   if (state.game.phase !== 'active') reasons.push('Match not active');
-  if (unit.requiresBuilding && you.buildings[unit.requiresBuilding] <= 0) reasons.push(`Needs ${unit.requiresBuilding.replace(/_/g, ' ')}`);
+  if (unit.requiresBuilding && you.buildings[unit.requiresBuilding] <= 0) reasons.push(`Needs ${state.meta.buildings[unit.requiresBuilding]?.name || unit.requiresBuilding.replace(/_/g, ' ')}`);
   if (unit.requiresTech && !you.research.completed.includes(unit.requiresTech)) reasons.push(`Needs ${techLabel(unit.requiresTech)}`);
   const missing = getMissingCost(unit.cost, amount);
   if (missing.length) reasons.push(`Missing ${missing.join(', ')}`);
@@ -362,7 +397,7 @@ function getResearchCardState(id) {
   return { disabled: reasons.length > 0, reasons, isCurrent };
 }
 
-function getQuickActionState(type) {
+function getQuickActionState(type, missileId = state.selectedMissile) {
   const you = state.game.you;
   const reasons = [];
   if (state.game.phase !== 'active') reasons.push('Match not active');
@@ -371,9 +406,10 @@ function getQuickActionState(type) {
     if (state.game.year < you.scoutCooldownUntil) reasons.push(`Cooldown until Year ${you.scoutCooldownUntil}`);
   }
   if (type === 'missile') {
-    if (you.buildings.missile_silo <= 0) reasons.push('Need missile silo');
-    const missing = getMissingCost(MISSILE_COST);
-    if (missing.length) reasons.push(`Missing ${missing.join(', ')}`);
+    const missile = state.meta.units[missileId];
+    if (!you.research.completed.includes('missile_silo')) reasons.push('Needs Missile Silo research');
+    if (!missile?.missile) reasons.push('Choose a missile type');
+    if ((you.units[missileId] || 0) <= 0) reasons.push(`Need ${missile?.name || 'missile stock'}`);
   }
   return { disabled: reasons.length > 0, reasons };
 }
@@ -391,10 +427,10 @@ function renderReasons(reasons) {
 }
 
 function formatPendingAction(action) {
-  if (action.type === 'missile') return `Missile strike -> ${action.target}`;
+  if (action.type === 'missile') return `${state.meta.units[action.missileId]?.name || 'Missile'} strike -> ${action.target}`;
   if (action.type === 'scout') return 'Scout mission';
   if (action.type === 'assault') {
-    const forces = ['soldier', 'tank', 'war_ship', 'fighter_zed']
+    const forces = getAssaultUnits().map(([id]) => id)
       .map((key) => action[key] ? `${emojis[key]}${action[key]}` : '')
       .filter(Boolean)
       .join(' ');
@@ -434,6 +470,7 @@ function renderDashboard() {
         <div class="small">Room: ${roomCode}</div>
         <div class="small">You: ${you.name}</div>
         <div class="small">Opponent: ${opponent}</div>
+        <div class="small">💳 Credits: ${you.credits}</div>
         <div class="small">Phase: ${getPhaseLabel()}</div>
         <div class="small">${summary}</div>
       </div>
@@ -449,12 +486,12 @@ function renderDashboard() {
   `;
 }
 
-function renderEconomyOrBuildings() {
+function renderEconomyOrSupports() {
   const you = state.game.you;
   const ids = Object.keys(state.meta.buildings).filter((id) => state.tab === 'economy'
     ? state.meta.buildings[id].category === 'economy'
     : state.meta.buildings[id].category === 'support');
-  tabContent.innerHTML = `<h3>${state.tab === 'economy' ? 'Economy' : 'Buildings'}</h3><div class="action-grid">` + ids.map((id) => {
+  tabContent.innerHTML = `<h3>${state.tab === 'economy' ? 'Economy' : 'Supports'}</h3><div class="action-grid">` + ids.map((id) => {
     const building = state.meta.buildings[id];
     const cardState = getBuildCardState(id);
     const label = cardState.inQueue ? `Building... (${ticksToMonths(cardState.inQueue.ticksRemaining)} months)` : 'Build';
@@ -471,14 +508,13 @@ function renderEconomyOrBuildings() {
 
 function renderMilitary() {
   const you = state.game.you;
-  const unitIds = Object.keys(state.meta.units);
-  const unitsHtml = unitIds.map((id) => {
-    const unit = state.meta.units[id];
+  const unitsHtml = getMilitaryUnits().map(([id, unit]) => {
     const unitState = getUnitCardState(id);
     return `<div class="card">
       <b>${emojis[id] || ''} ${unit.name}</b>
       <div class="small">Owned: ${you.units[id]}</div>
       <div class="small">Cost: ${costLine(unit.cost)}</div>
+      <div class="small">${unit.missile ? 'Missile payload' : `Attack ${unit.attack || 0}${unit.defense ? ` | Defence ${unit.defense}` : ''}`}</div>
       ${renderReasons(unitState.reasons)}
       <div class="row stepper">
         ${actionBtn('-', () => adjustUnitDraft(id, -1))}
@@ -498,8 +534,7 @@ function renderMilitary() {
 
 function renderDefences() {
   const you = state.game.you;
-  const defenseIds = ['missile_silo', 'anti_missile_battery', 'wall'];
-  const defensesHtml = defenseIds.map((id) => {
+  const defenceBuildings = ['anti_missile_battery', 'land_mine'].map((id) => {
     const building = state.meta.buildings[id];
     const cardState = getBuildCardState(id);
     const label = cardState.inQueue ? `Building... (${ticksToMonths(cardState.inQueue.ticksRemaining)} months)` : 'Build';
@@ -513,11 +548,60 @@ function renderDefences() {
     </div>`;
   }).join('');
 
+  const defenceUnits = getDefenceUnits().map(([id, unit]) => {
+    const unitState = getUnitCardState(id);
+    return `<div class="card">
+      <b>${emojis[id] || ''} ${unit.name}</b>
+      <div class="small">Owned: ${you.units[id]}</div>
+      <div class="small">Cost: ${costLine(unit.cost)}</div>
+      <div class="small">Defence ${unit.defense || 0}</div>
+      ${renderReasons(unitState.reasons)}
+      <div class="row stepper">
+        ${actionBtn('-', () => adjustUnitDraft(id, -1))}
+        <input id="amt_${id}" value="${getUnitDraft(id)}" type="number" min="1" readonly />
+        ${actionBtn('+', () => adjustUnitDraft(id, 1))}
+        ${actionBtn('Train', () => sendAction('train', { id, amount: getUnitDraft(id) }), { disabled: unitState.disabled, title: unitState.reasons.join(' | ') })}
+      </div>
+    </div>`;
+  }).join('');
+
   tabContent.innerHTML = `
     <div class="panel inset">
       <h3>Defences</h3>
-      <div class="action-grid">${defensesHtml}</div>
+      <div class="action-grid">${defenceBuildings}${defenceUnits}</div>
     </div>
+  `;
+}
+
+function renderTrade() {
+  const you = state.game.you;
+  const rows = state.meta.resources.map((resource) => {
+    const amount = getTradeDraft(resource);
+    const buyCost = amount + (state.meta.tradeFee || 1);
+    const sellReturn = Math.max(0, amount - (state.meta.tradeFee || 1));
+    const buyDisabled = state.game.phase !== 'active' || you.credits < buyCost;
+    const sellDisabled = state.game.phase !== 'active' || (you.resources[resource] || 0) < amount;
+    return `<div class="card">
+      <b>${emojis[resource] || ''} ${resource}</b>
+      <div class="small">Stock: ${Math.floor(you.resources[resource] || 0)} | Credits: ${you.credits}</div>
+      <div class="small">Rate: 1 credit per unit + ${state.meta.tradeFee || 1} credit trade fee</div>
+      <div class="row stepper">
+        ${actionBtn('-', () => adjustTradeDraft(resource, -1))}
+        <input id="trade_${resource}" value="${amount}" type="number" min="1" readonly />
+        ${actionBtn('+', () => adjustTradeDraft(resource, 1))}
+      </div>
+      <div class="row">
+        ${actionBtn(`Buy (${buyCost})`, () => sendAction('trade', { mode: 'buy', resource, amount }), { disabled: buyDisabled, title: buyDisabled ? 'Not enough credits or match inactive' : '' })}
+        ${actionBtn(`Sell (+${sellReturn})`, () => sendAction('trade', { mode: 'sell', resource, amount }), { disabled: sellDisabled, title: sellDisabled ? 'Not enough stock or match inactive' : '' })}
+      </div>
+    </div>`;
+  }).join('');
+
+  tabContent.innerHTML = `
+    <h3>Trade</h3>
+    <div class="small">Population generates credits at year end. Each trade uses a 1-credit fee on top of the buy or sell amount.</div>
+    <div class="small">Treasury: ${you.credits} credits</div>
+    <div class="action-grid">${rows}</div>
   `;
 }
 
@@ -535,9 +619,10 @@ function renderSidebar() {
     <tr><td>${emojis[id] || ''} ${building.name}</td><td>${building.category}</td><td>${you.buildings[id]}</td></tr>
   `).join('');
 
-  const defenceRows = ['missile_silo', 'anti_missile_battery', 'wall'].map((id) => `
-    <tr><td>${emojis[id] || ''} ${state.meta.buildings[id].name}</td><td>${you.buildings[id]}</td></tr>
-  `).join('');
+  const defenceRows = [
+    ...['anti_missile_battery', 'land_mine'].map((id) => `<tr><td>${emojis[id] || ''} ${state.meta.buildings[id].name}</td><td>${you.buildings[id]}</td></tr>`),
+    ...getDefenceUnits().map(([id, unit]) => `<tr><td>${emojis[id] || ''} ${unit.name}</td><td>${you.units[id]}</td></tr>`)
+  ].join('');
 
   const unitRows = Object.entries(state.meta.units).map(([id, unit]) => `
     <tr><td>${emojis[id] || ''} ${unit.name}</td><td>${you.units[id]}</td></tr>
@@ -548,6 +633,7 @@ function renderSidebar() {
     <div class="small">📅 Year ${state.game.year}, Month ${state.game.month}</div>
     <div class="small">⏱️ ${countdown}</div>
     <div class="small">👥 Population ${you.population}/${you.populationMax}</div>
+    <div class="small">💳 Credits ${you.credits}</div>
     <div class="small">🎯 ${getPhaseLabel()}</div>
     <div class="split-panels">
       <div class="panel inset">
@@ -558,9 +644,9 @@ function renderSidebar() {
         </table>
       </div>
       <div class="panel inset">
-        <h3>Buildings</h3>
+        <h3>Supports</h3>
         <table class="data-table">
-          <thead><tr><th>Building</th><th>Category</th><th>Owned</th></tr></thead>
+          <thead><tr><th>Item</th><th>Category</th><th>Owned</th></tr></thead>
           <tbody>${buildingRows}</tbody>
         </table>
       </div>
@@ -604,11 +690,11 @@ function renderResearch() {
 
 function renderWarRoom() {
   const scoutState = getQuickActionState('scout');
-  const missileState = getQuickActionState('missile');
-  updateWarRoomDraft('soldier', state.warRoomDraft.soldier);
-  updateWarRoomDraft('tank', state.warRoomDraft.tank);
-  updateWarRoomDraft('war_ship', state.warRoomDraft.war_ship);
-  updateWarRoomDraft('fighter_zed', state.warRoomDraft.fighter_zed);
+  const missileState = getQuickActionState('missile', state.selectedMissile);
+  const assaultRows = getAssaultUnits().map(([id, unit]) => {
+    updateWarRoomDraft(id, state.warRoomDraft[id] || 0);
+    return `<div class="row stepper">${emojis[id] || ''}${actionBtn('-', () => adjustWarRoomDraft(id, -1))}<input id="wr_${id}" type="number" value="${state.warRoomDraft[id]}" min="0" readonly />${actionBtn('+', () => adjustWarRoomDraft(id, 1))}<span class="small">${unit.name}</span></div>`;
+  }).join('');
   tabContent.innerHTML = `<h3>War Room</h3>
     <p>Queue actions now. All attacks resolve when the current year ends.</p>
     ${renderPendingActions()}
@@ -617,32 +703,36 @@ function renderWarRoom() {
       <div class="row">${actionBtn('Launch Scout', () => sendAction('scout', {}), { disabled: scoutState.disabled, title: scoutState.reasons.join(' | ') })}</div>
       ${renderReasons(missileState.reasons)}
       <div class="row">
+        <select id="wrMissile">
+          ${getMilitaryUnits().filter(([, unit]) => unit.missile).map(([id, unit]) => `<option value="${id}" ${state.selectedMissile === id ? 'selected' : ''}>${unit.name}</option>`).join('')}
+        </select>
         <select id="wrTarget">
           <option value="economy">Economy</option>
           <option value="military">Military</option>
-          <option value="support">Population Centers</option>
+          <option value="support">Supports</option>
         </select>
-        ${actionBtn('Launch Missile', () => sendAction('missile', { target: document.getElementById('wrTarget').value }), { disabled: missileState.disabled, title: missileState.reasons.join(' | ') })}
+        ${actionBtn('Launch Missile', () => {
+          state.selectedMissile = document.getElementById('wrMissile').value;
+          sendAction('missile', { missileId: state.selectedMissile, target: document.getElementById('wrTarget').value });
+        }, { disabled: missileState.disabled, title: missileState.reasons.join(' | ') })}
       </div>
-      <div class="war-room-grid" title="Commit: Soldier, Tank, War Ship, Fighter Zed">
-        <div class="row stepper">🪖${actionBtn('-', () => adjustWarRoomDraft('soldier', -1))}<input id="wr_soldier" type="number" value="${state.warRoomDraft.soldier}" min="0" readonly />${actionBtn('+', () => adjustWarRoomDraft('soldier', 1))}</div>
-        <div class="row stepper">🛞${actionBtn('-', () => adjustWarRoomDraft('tank', -1))}<input id="wr_tank" type="number" value="${state.warRoomDraft.tank}" min="0" readonly />${actionBtn('+', () => adjustWarRoomDraft('tank', 1))}</div>
-        <div class="row stepper">🚢${actionBtn('-', () => adjustWarRoomDraft('war_ship', -1))}<input id="wr_war_ship" type="number" value="${state.warRoomDraft.war_ship}" min="0" readonly />${actionBtn('+', () => adjustWarRoomDraft('war_ship', 1))}</div>
-        <div class="row stepper">🛩️${actionBtn('-', () => adjustWarRoomDraft('fighter_zed', -1))}<input id="wr_fighter_zed" type="number" value="${state.warRoomDraft.fighter_zed}" min="0" readonly />${actionBtn('+', () => adjustWarRoomDraft('fighter_zed', 1))}</div>
-        ${actionBtn('Commit Assault', () => sendAction('assault', {
-          soldier: state.warRoomDraft.soldier,
-          tank: state.warRoomDraft.tank,
-          war_ship: state.warRoomDraft.war_ship,
-          fighter_zed: state.warRoomDraft.fighter_zed
-        }), { disabled: state.game.phase !== 'active', title: state.game.phase !== 'active' ? 'Match not active' : '' })}
+      <div class="war-room-grid" title="Commit assault units">
+        ${assaultRows}
+        ${actionBtn('Commit Assault', () => sendAction('assault', Object.fromEntries(getAssaultUnits().map(([id]) => [id, state.warRoomDraft[id] || 0]))), { disabled: state.game.phase !== 'active', title: state.game.phase !== 'active' ? 'Match not active' : '' })}
       </div>
     </div>`;
+  document.getElementById('wrMissile')?.addEventListener('change', (event) => {
+    state.selectedMissile = event.target.value;
+    state.forceTabRefresh = true;
+    renderAll();
+  });
 }
 
 function renderTab() {
   if (!state.game?.you) return;
   if (state.tab === 'dashboard') return renderDashboard();
-  if (state.tab === 'economy' || state.tab === 'buildings') return renderEconomyOrBuildings();
+  if (state.tab === 'economy' || state.tab === 'supports') return renderEconomyOrSupports();
+  if (state.tab === 'trade') return renderTrade();
   if (state.tab === 'military') return renderMilitary();
   if (state.tab === 'defences') return renderDefences();
   if (state.tab === 'research') return renderResearch();
@@ -660,7 +750,7 @@ async function sendAction(type, payload) {
 }
 
 function drawTabs() {
-  tabsEl.innerHTML = tabs.map((tab) => `<button class="tab ${state.tab === tab ? 'active' : ''}" data-tab="${tab}">${tab.replace('_', ' ')}</button>`).join('');
+  tabsEl.innerHTML = tabs.map((tab) => `<button class="tab ${state.tab === tab ? 'active' : ''}" data-tab="${tab}">${tabLabels[tab] || tab.replace('_', ' ')}</button>`).join('');
   tabsEl.querySelectorAll('button').forEach((button) => {
     button.addEventListener('click', () => {
       state.tab = button.dataset.tab;

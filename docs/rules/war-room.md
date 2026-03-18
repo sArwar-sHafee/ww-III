@@ -1,16 +1,19 @@
 # War Room Rules
 
 ## Scouting
-- Scout Drone reveals exact buildings and approximate resources (±10%) for 2 years.
-- Target receives a "Scout Detected" event.
+- Scout Drone reveals exact enemy buildings and approximate resources for 2 years.
+- Target receives a scout-detected event.
 
 ## Missile Strikes
-- Requires Missile Silo.
-- Cost per missile: 8 steel, 6 oil, 3 electricity.
-- Damage: 20-35% of targeted category (reduced by Anti-Missile Batteries).
+- Requires `Missile Silo` research.
+- Consumes one trained missile unit per launch.
+- Supported missile payloads: Ballistic Missile, Cruise Missile.
+- Anti-Missile Battery can intercept incoming missiles.
 
 ## Ground Assaults
-- Attacker strength = (soldiers × 10) + (tanks × 25) + (war_ships × 50) + (fighter_zeds × 40)
-- Defender strength = (remaining soldiers × 5) + (tanks × 12) + (war_ships × 25) + (fighter_zeds × 20) + (Wall bonus)
-- Winner loses 30% committed forces; loser loses 70% plus 1-2 random buildings.
-- Attacker steals 10-20% of one random resource if victorious.
+- Any unit marked as assault-capable may be committed.
+- Attacker strength is the sum of committed units' `attack` values.
+- Defender strength is the sum of defending units' `defense` values plus Land Mine bonus.
+- Winner loses 30% of committed forces.
+- Loser loses 70% of defending force share.
+- Successful assaults loot 10-20% of one random resource.

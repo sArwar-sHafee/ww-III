@@ -12,8 +12,12 @@ const SSE_HEARTBEAT_MS = 15_000;
 const TICK_MS = 1000;
 const TICKS_PER_YEAR = 60;
 const TICKS_PER_MONTH = 5;
-const STARTING_RESOURCES = { nutrition: 200, lumber: 150, steel: 100, alloy: 50, oil: 20, magnet: 20, electricity: 20, glass: 20, plastic: 20, concrete: 20, silicon: 20 };
+const TRADE_FEE = 1;
+const STARTING_RESOURCES = { nutrition: 5000, lumber: 3000, steel: 3000, alloy: 2000, oil: 2000, magnet: 1500, electricity: 2000, glass: 1500, polymer: 1500, concrete: 1500, silicon: 1500 };
 const RESOURCE_KEYS = Object.keys(STARTING_RESOURCES);
+const STARTING_POPULATION = 100;
+const STARTING_POPULATION_MAX = 100;
+const STARTING_CREDITS = 500;
 
 const BUILDINGS = {
   farm: { name: 'Farm', cost: { lumber: 15, steel: 10 }, buildTime: 2, capacity: { nutrition: 200 }, production: { nutrition: 4 }, category: 'economy' },
@@ -24,42 +28,92 @@ const BUILDINGS = {
   magnet_extractor: { name: 'Magnet Extractor', cost: { steel: 40, alloy: 15, oil: 10 }, buildTime: 3, capacity: { magnet: 60 }, production: { magnet: 1 }, requires: ['advanced_mining'], category: 'economy' },
   power_plant: { name: 'Power Plant', cost: { steel: 25, oil: 15 }, buildTime: 2, capacity: { electricity: 80 }, production: { electricity: 3 }, upkeep: { oil: 1 }, requires: ['electricity'], category: 'economy' },
   glassworks: { name: 'Glassworks', cost: { lumber: 15, steel: 10 }, buildTime: 2, capacity: { glass: 120 }, production: { glass: 2 }, requires: ['industrial_furnaces'], category: 'economy' },
-  plastics_plant: { name: 'Plastics Plant', cost: { steel: 10, oil: 15, electricity: 5 }, buildTime: 2, capacity: { plastic: 120 }, production: { plastic: 2 }, requires: ['plastics'], category: 'economy' },
+  polymer_plant: { name: 'Polymer Plant', cost: { steel: 10, oil: 15, electricity: 5 }, buildTime: 2, capacity: { polymer: 120 }, production: { polymer: 2 }, requires: ['polymer'], category: 'economy' },
   concrete_plant: { name: 'Concrete Plant', cost: { lumber: 20, steel: 10, electricity: 5 }, buildTime: 2, capacity: { concrete: 180 }, production: { concrete: 3 }, requires: ['industrial_materials'], category: 'economy' },
   silicon_refinery: { name: 'Silicon Refinery', cost: { steel: 20, alloy: 10, electricity: 5 }, buildTime: 3, capacity: { silicon: 80 }, production: { silicon: 1 }, requires: ['advanced_mining'], category: 'economy' },
-  house: { name: 'House', cost: { lumber: 20, steel: 10 }, buildTime: 1, category: 'support' },
+  shelter: { name: 'Shelter', cost: { lumber: 20, steel: 10 }, buildTime: 1, category: 'support' },
   barracks: { name: 'Barracks', cost: { lumber: 30, steel: 20 }, buildTime: 2, category: 'support' },
   factory: { name: 'Factory', cost: { steel: 40, alloy: 25, oil: 10 }, buildTime: 3, requires: ['electricity'], category: 'support' },
   radar_station: { name: 'Radar Station', cost: { steel: 20, alloy: 15, magnet: 10 }, buildTime: 2, requires: ['advanced_scouting'], category: 'support' },
-  missile_silo: { name: 'Missile Silo', cost: { steel: 35, oil: 20, alloy: 15 }, buildTime: 3, requires: ['guided_missiles'], category: 'military' },
   anti_missile_battery: { name: 'Anti-Missile Battery', cost: { steel: 30, oil: 15, magnet: 10 }, buildTime: 2, requires: ['guided_missiles'], category: 'military' },
-  wall: { name: 'Wall', cost: { lumber: 50, steel: 30 }, buildTime: 2, category: 'military' },
+  land_mine: { name: 'Land Mine', cost: { lumber: 50, steel: 30 }, buildTime: 2, category: 'military' },
   dry_dock: { name: 'Dry Dock', cost: { lumber: 50, steel: 40, concrete: 20 }, buildTime: 3, category: 'support' },
   airfield: { name: 'Airfield', cost: { steel: 60, alloy: 30, concrete: 40 }, buildTime: 3, category: 'support' }
 };
 
 const UNITS = {
-  soldier: { name: 'Soldier', cost: { nutrition: 8, steel: 4 }, upkeep: { nutrition: 0.5 }, attack: 10, requiresBuilding: 'barracks' },
-  tank: { name: 'Tank', cost: { steel: 12, oil: 8 }, upkeep: { nutrition: 1, oil: 0.5 }, attack: 25, requiresTech: 'tanks', requiresBuilding: 'barracks' },
-  war_ship: { name: 'War Ship', cost: { steel: 50, alloy: 30, oil: 20 }, upkeep: { nutrition: 2, oil: 1 }, attack: 100, requiresTech: 'naval_warfare', requiresBuilding: 'dry_dock' },
-  fighter_zed: { name: 'Fighter Zed', cost: { alloy: 40, oil: 20, silicon: 10 }, upkeep: { nutrition: 1, oil: 2 }, attack: 150, requiresTech: 'aerial_warfare', requiresBuilding: 'airfield' },
-  scout_drone: { name: 'Scout Drone', cost: { oil: 5, electricity: 3 }, upkeep: { electricity: 1 }, requiresBuilding: 'radar_station' }
+  infantry: { name: 'Infantry', section: 'military', cost: { nutrition: 8, steel: 4 }, upkeep: { nutrition: 0.5 }, attack: 10, defense: 5, requiresBuilding: 'barracks', assault: true },
+  special_force: { name: 'Special Force', section: 'military', cost: { nutrition: 10, steel: 8, electricity: 2 }, upkeep: { nutrition: 1, electricity: 0.5 }, attack: 22, defense: 14, requiresTech: 'advanced_scouting', requiresBuilding: 'barracks', assault: true },
+  tank: { name: 'Tank', section: 'military', cost: { steel: 12, oil: 8 }, upkeep: { nutrition: 1, oil: 0.5 }, attack: 25, defense: 12, requiresTech: 'tanks', requiresBuilding: 'barracks', assault: true },
+  war_ship: { name: 'War Ship', section: 'military', cost: { steel: 50, alloy: 30, oil: 20 }, upkeep: { nutrition: 2, oil: 1 }, attack: 50, defense: 25, requiresTech: 'naval_warfare', requiresBuilding: 'dry_dock', assault: true },
+  submarine: { name: 'Submarine', section: 'military', cost: { steel: 60, alloy: 35, oil: 25 }, upkeep: { nutrition: 2, oil: 1.5 }, attack: 80, defense: 40, requiresTech: 'naval_warfare', requiresBuilding: 'dry_dock', assault: true },
+  fighter_zed: { name: 'Fighter Zed', section: 'military', cost: { alloy: 40, oil: 20, silicon: 10 }, upkeep: { nutrition: 1, oil: 2 }, attack: 40, defense: 20, requiresTech: 'aerial_warfare', requiresBuilding: 'airfield', assault: true },
+  attack_helicopter: { name: 'Attack Helicopter', section: 'military', cost: { steel: 20, alloy: 25, oil: 15 }, upkeep: { nutrition: 1, oil: 1.5 }, attack: 60, defense: 30, requiresTech: 'aerial_warfare', requiresBuilding: 'airfield', assault: true },
+  combat_drone: { name: 'Combat Drone', section: 'military', cost: { alloy: 15, electricity: 10, silicon: 8 }, upkeep: { electricity: 1, oil: 0.5 }, attack: 35, defense: 18, requiresTech: 'advanced_scouting', requiresBuilding: 'airfield', assault: true },
+  ballistic_missile: { name: 'Ballistic Missile', section: 'military', cost: { steel: 20, alloy: 20, oil: 12 }, attack: 160, requiresTech: 'missile_silo', missile: true },
+  cruise_missile: { name: 'Cruise Missile', section: 'military', cost: { steel: 14, alloy: 12, oil: 10 }, attack: 110, requiresTech: 'missile_silo', missile: true },
+  scout_drone: { name: 'Scout Drone', section: 'military', cost: { oil: 5, electricity: 3 }, upkeep: { electricity: 1 }, requiresBuilding: 'radar_station' },
+  anti_tank_squad: { name: 'Anti-Tank Squad', section: 'defence', cost: { nutrition: 6, steel: 8 }, upkeep: { nutrition: 0.5 }, defense: 18, requiresTech: 'tanks', requiresBuilding: 'barracks' },
+  naval_strike_missile: { name: 'Naval Strike Missile', section: 'defence', cost: { steel: 18, alloy: 15, oil: 10 }, defense: 45, requiresTech: 'guided_missiles', requiresBuilding: 'dry_dock' },
+  air_defence_gun: { name: 'Air Defence Gun', section: 'defence', cost: { steel: 16, alloy: 8, electricity: 6 }, upkeep: { electricity: 0.5 }, defense: 28, requiresTech: 'guided_missiles', requiresBuilding: 'airfield' }
 };
 
 const RESEARCH = {
   basic_tools: { name: 'Basic Tools', cost: { alloy: 15 }, years: 2, minYear: 3 },
   electricity: { name: 'Electricity', cost: { alloy: 25, magnet: 5 }, years: 3, prereq: 'basic_tools' },
   guided_missiles: { name: 'Guided Missiles', cost: { alloy: 30, magnet: 10 }, years: 3, prereq: 'basic_tools' },
+  missile_silo: { name: 'Missile Silo', cost: { alloy: 45, magnet: 20, steel: 10 }, years: 4, prereq: 'guided_missiles' },
   industrial_furnaces: { name: 'Industrial Furnaces', cost: { alloy: 20, steel: 5 }, years: 2, prereq: 'basic_tools' },
   advanced_mining: { name: 'Advanced Mining', cost: { alloy: 35, magnet: 15 }, years: 3, prereq: 'electricity' },
   tanks: { name: 'Tank Technology', cost: { alloy: 40, magnet: 20 }, years: 4, prereq: 'guided_missiles' },
   naval_warfare: { name: 'Naval Warfare', cost: { alloy: 40, magnet: 20 }, years: 4, prereq: 'basic_tools' },
   aerial_warfare: { name: 'Aerial Warfare', cost: { alloy: 50, silicon: 20 }, years: 4, prereq: 'electricity' },
   advanced_scouting: { name: 'Advanced Scouting', cost: { alloy: 25, magnet: 10 }, years: 2, prereq: 'industrial_furnaces' },
-  plastics: { name: 'Plastics', cost: { alloy: 30, oil: 10 }, years: 3, prereq: 'electricity' },
+  polymer: { name: 'Polymer', cost: { alloy: 30, oil: 10 }, years: 3, prereq: 'electricity' },
   industrial_materials: { name: 'Industrial Materials', cost: { alloy: 20, steel: 5, electricity: 5 }, years: 2, prereq: 'industrial_furnaces' },
   nuclear_technology: { name: 'Nuclear Technology', cost: { alloy: 100, magnet: 50, electricity: 30 }, years: 5, prereq: 'advanced_mining' }
 };
+
+const STARTING_BUILDINGS = {
+  farm: 8,
+  lumber_camp: 6,
+  steel_mill: 6,
+  alloy_quarry: 5,
+  oil_rig: 4,
+  magnet_extractor: 4,
+  power_plant: 5,
+  glassworks: 3,
+  polymer_plant: 3,
+  concrete_plant: 3,
+  silicon_refinery: 3,
+  shelter: 10,
+  barracks: 3,
+  factory: 2,
+  radar_station: 2,
+  anti_missile_battery: 1,
+  land_mine: 1,
+  dry_dock: 1,
+  airfield: 1
+};
+
+const STARTING_UNITS = {
+  infantry: 50,
+  special_force: 20,
+  tank: 30,
+  war_ship: 20,
+  fighter_zed: 20,
+  attack_helicopter: 12,
+  combat_drone: 20,
+  ballistic_missile: 10,
+  cruise_missile: 12,
+  submarine: 8,
+  scout_drone: 20,
+  anti_tank_squad: 18,
+  naval_strike_missile: 10,
+  air_defence_gun: 12
+};
+
+const STARTING_RESEARCH = Object.keys(RESEARCH);
 
 const rooms = new Map();
 
@@ -68,13 +122,14 @@ function createPlayer(playerId, name) {
     playerId,
     reconnectToken: randomUUID(),
     name,
-    population: 10,
-    populationMax: 10,
+    population: STARTING_POPULATION,
+    populationMax: STARTING_POPULATION_MAX,
+    credits: STARTING_CREDITS,
     resources: { ...STARTING_RESOURCES },
-    buildings: Object.fromEntries(Object.keys(BUILDINGS).map((k) => [k, 0])),
+    buildings: Object.fromEntries(Object.keys(BUILDINGS).map((k) => [k, STARTING_BUILDINGS[k] || 0])),
     buildingQueues: [],
-    units: { soldier: 0, tank: 0, war_ship: 0, fighter_zed: 0, scout_drone: 0 },
-    research: { completed: [], active: null },
+    units: { ...STARTING_UNITS },
+    research: { completed: [...STARTING_RESEARCH], active: null },
     eventLog: [],
     chat: [],
     pending: [],
@@ -117,6 +172,30 @@ function addResourceDelta(deltas, key, value) {
   deltas[key] = (deltas[key] || 0) + value;
 }
 
+function getPlayerCapacity(player) {
+  const capacity = Object.fromEntries(RESOURCE_KEYS.map((k) => [k, 999999]));
+  for (const [id, count] of Object.entries(player.buildings)) {
+    const cfg = BUILDINGS[id];
+    if (!cfg?.capacity || count <= 0) continue;
+    for (const [rk, rv] of Object.entries(cfg.capacity)) capacity[rk] = (capacity[rk] || 0) + rv * count;
+  }
+  return capacity;
+}
+
+function getMissileDamage(unitId) {
+  if (unitId === 'ballistic_missile') return 0.25 + Math.random() * 0.15;
+  if (unitId === 'cruise_missile') return 0.18 + Math.random() * 0.12;
+  return 0;
+}
+
+function getAssaultUnitIds() {
+  return Object.entries(UNITS).filter(([, unit]) => unit.assault).map(([id]) => id);
+}
+
+function getDefenceUnitIds() {
+  return Object.entries(UNITS).filter(([, unit]) => unit.defense).map(([id]) => id);
+}
+
 function createRoom() {
   let id;
   do id = String(Math.floor(1000 + Math.random() * 9000)); while (rooms.has(id));
@@ -149,7 +228,7 @@ function resolveTick(room) {
     p.buildingQueues = p.buildingQueues.filter((q) => q.ticksRemaining > 0);
     for (const item of completed) {
       p.buildings[item.id]++;
-      if (item.id === 'house') p.populationMax += 5;
+      if (item.id === 'shelter') p.populationMax += 5;
       appendEvent(p, room.year, `✅ ${BUILDINGS[item.id].name} completed`);
     }
     if (p.research.active) {
@@ -192,22 +271,22 @@ function resolveTick(room) {
     if (isYearEnd) {
       const opponent = room.players[room.playerOrder.find((x) => x !== playerId)];
       for (const action of p.pending) {
-        if (action.type === 'missile' && p.buildings.missile_silo > 0 && canAfford(p.resources, { steel: 8, oil: 6, electricity: 3 })) {
-          payCost(p.resources, { steel: 8, oil: 6, electricity: 3 });
+        if (action.type === 'missile' && p.research.completed.includes('missile_silo') && UNITS[action.missileId]?.missile && p.units[action.missileId] > 0) {
+          p.units[action.missileId] -= 1;
           const interceptionChance = 0.35 * opponent.buildings.anti_missile_battery;
           if (Math.random() < interceptionChance) {
-            appendEvent(p, room.year, '🛡️ Missile intercepted');
+            appendEvent(p, room.year, `🛡️ ${UNITS[action.missileId].name} intercepted`);
             appendEvent(opponent, room.year, '🛡️ You intercepted an incoming missile');
           } else {
-            const damage = 0.2 + Math.random() * 0.15;
+            const damage = getMissileDamage(action.missileId);
             const categoryBuildings = Object.entries(BUILDINGS).filter(([, c]) => c.category === action.target && opponent.buildings).map(([k]) => k);
             for (const bid of categoryBuildings) {
               const lost = Math.floor(opponent.buildings[bid] * damage);
               opponent.buildings[bid] = Math.max(0, opponent.buildings[bid] - lost);
             }
             if (action.target === 'support') opponent.population = Math.max(0, opponent.population - Math.ceil(opponent.population * damage * 0.3));
-            appendEvent(p, room.year, '💥 Missile hit target');
-            appendEvent(opponent, room.year, '💥 Incoming missile damaged your base');
+            appendEvent(p, room.year, `💥 ${UNITS[action.missileId].name} hit target`);
+            appendEvent(opponent, room.year, `💥 Incoming ${UNITS[action.missileId].name} damaged your base`);
           }
         }
         if (action.type === 'scout' && p.units.scout_drone > 0 && room.year >= p.scoutCooldownUntil) {
@@ -217,24 +296,19 @@ function resolveTick(room) {
           appendEvent(opponent, room.year, '👁️ Scout detected');
         }
         if (action.type === 'assault') {
-          const soldiers = Math.min(action.soldier || 0, p.units.soldier);
-          const tanks = Math.min(action.tank || 0, p.units.tank);
-          const ships = Math.min(action.war_ship || 0, p.units.war_ship);
-          const planes = Math.min(action.fighter_zed || 0, p.units.fighter_zed);
-          const atk = soldiers * 10 + tanks * 25 + ships * 50 + planes * 40;
-          const def = opponent.units.soldier * 5 + opponent.units.tank * 12 + opponent.units.war_ship * 25 + opponent.units.fighter_zed * 20 + (opponent.buildings.wall > 0 ? 100 : 0);
+          const committed = Object.fromEntries(getAssaultUnitIds().map((id) => [id, Math.min(action[id] || 0, p.units[id])]));
+          const atk = Object.entries(committed).reduce((sum, [id, count]) => sum + count * (UNITS[id].attack || 0), 0);
+          const def = getDefenceUnitIds().reduce((sum, id) => sum + (opponent.units[id] || 0) * (UNITS[id].defense || 0), 0) + opponent.buildings.land_mine * 80;
           if (atk > 0) {
             const attackerWon = atk > def;
             const atkLoss = attackerWon ? 0.3 : 0.7;
             const defLoss = attackerWon ? 0.7 : 0.3;
-            p.units.soldier -= Math.floor(soldiers * atkLoss);
-            p.units.tank -= Math.floor(tanks * atkLoss);
-            p.units.war_ship -= Math.floor(ships * atkLoss);
-            p.units.fighter_zed -= Math.floor(planes * atkLoss);
-            opponent.units.soldier = Math.max(0, opponent.units.soldier - Math.floor(opponent.units.soldier * defLoss));
-            opponent.units.tank = Math.max(0, opponent.units.tank - Math.floor(opponent.units.tank * defLoss));
-            opponent.units.war_ship = Math.max(0, opponent.units.war_ship - Math.floor(opponent.units.war_ship * defLoss));
-            opponent.units.fighter_zed = Math.max(0, opponent.units.fighter_zed - Math.floor(opponent.units.fighter_zed * defLoss));
+            for (const [id, count] of Object.entries(committed)) {
+              p.units[id] -= Math.floor(count * atkLoss);
+            }
+            for (const id of getDefenceUnitIds()) {
+              opponent.units[id] = Math.max(0, opponent.units[id] - Math.floor(opponent.units[id] * defLoss));
+            }
             if (attackerWon) {
               const lootResource = RESOURCE_KEYS[Math.floor(Math.random() * RESOURCE_KEYS.length)];
               const pct = 0.1 + Math.random() * 0.1;
@@ -253,12 +327,7 @@ function resolveTick(room) {
     }
 
     // 5 apply resource deltas + capacity
-    const capacity = Object.fromEntries(RESOURCE_KEYS.map((k) => [k, 999999]));
-    for (const [id, count] of Object.entries(p.buildings)) {
-      const cfg = BUILDINGS[id];
-      if (!cfg?.capacity || count <= 0) continue;
-      for (const [rk, rv] of Object.entries(cfg.capacity)) capacity[rk] = (capacity[rk] || 0) + rv * count;
-    }
+    const capacity = getPlayerCapacity(p);
     p.net = {};
     for (const key of RESOURCE_KEYS) {
       p.net[key] = deltas[key] * TICKS_PER_YEAR; // Show yearly net in UI
@@ -280,6 +349,8 @@ function resolveTick(room) {
           appendEvent(p, room.year, `👶 Population growth: +${growth}`);
         }
       }
+      p.credits += p.population;
+      appendEvent(p, room.year, `💳 Treasury income: +${p.population} credits`);
     }
 
     const anyRes = RESOURCE_KEYS.some((k) => p.resources[k] > 0);
@@ -325,6 +396,7 @@ function stripStateFor(room, playerId) {
       name: p.name,
       population: p.population,
       populationMax: p.populationMax,
+      credits: p.credits,
       resources: p.resources,
       buildings: p.buildings,
       buildingQueues: p.buildingQueues,
@@ -537,6 +609,26 @@ const server = http.createServer(async (req, res) => {
         payCost(p.resources, tech.cost);
         p.research.active = { id: payload.id, ticksRemaining: tech.years * TICKS_PER_MONTH };
         appendEvent(p, room.year, `🧠 Started research: ${tech.name}`);
+      } else if (type === 'trade') {
+        const resource = payload.resource;
+        const amount = Math.max(1, Number(payload.amount || 1));
+        const mode = payload.mode === 'sell' ? 'sell' : 'buy';
+        if (!RESOURCE_KEYS.includes(resource)) return writeJson(res, 400, { error: 'Invalid resource' });
+        if (mode === 'buy') {
+          const cost = amount + TRADE_FEE;
+          const capacity = getPlayerCapacity(p)[resource];
+          if (p.credits < cost) return writeJson(res, 400, { error: 'Not enough credits' });
+          if (p.resources[resource] + amount > capacity) return writeJson(res, 400, { error: 'Storage full' });
+          p.credits -= cost;
+          p.resources[resource] += amount;
+          appendEvent(p, room.year, `💳 Bought ${amount} ${resource} for ${cost} credits`);
+        } else {
+          if ((p.resources[resource] ?? 0) < amount) return writeJson(res, 400, { error: 'Not enough resource to sell' });
+          const revenue = Math.max(0, amount - TRADE_FEE);
+          p.resources[resource] -= amount;
+          p.credits += revenue;
+          appendEvent(p, room.year, `💳 Sold ${amount} ${resource} for ${revenue} credits`);
+        }
       } else if (type === 'chat') {
         const msg = String(payload.text || '').slice(0, 240);
         if (!msg) return writeJson(res, 400, { error: 'Empty message' });
@@ -568,7 +660,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === '/api/meta' && req.method === 'GET') {
-      return writeJson(res, 200, { buildings: BUILDINGS, units: UNITS, research: RESEARCH, resources: RESOURCE_KEYS, tickMs: TICK_MS, ticksPerMonth: TICKS_PER_MONTH, ticksPerYear: TICKS_PER_YEAR });
+      return writeJson(res, 200, { buildings: BUILDINGS, units: UNITS, research: RESEARCH, resources: RESOURCE_KEYS, tickMs: TICK_MS, ticksPerMonth: TICKS_PER_MONTH, ticksPerYear: TICKS_PER_YEAR, tradeFee: TRADE_FEE });
     }
 
     let filePath = url.pathname === '/' ? '/index.html' : url.pathname;

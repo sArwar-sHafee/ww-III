@@ -1,8 +1,7 @@
 # Emoji Map
 
-Use this exact emoji set for UI consistency. If a platform lacks a glyph, fall back to a close equivalent but keep the meaning.
-
-## Resources (Top Bar)
+## Treasury And Resources
+- Credits: 💳
 - Nutrition: 🍲
 - Lumber: 🪵
 - Steel: 🔩
@@ -11,12 +10,11 @@ Use this exact emoji set for UI consistency. If a platform lacks a glyph, fall b
 - Magnet: 🧲
 - Electricity: ⚡
 - Glass: 🪟
-- Plastic: ♻️
+- Polymer: ♻️
 - Concrete: 🧱
 - Silicon: 💾
 
-## Buildings
-### Resource Buildings
+## Structures
 - Farm: 🌾
 - Lumber Camp: 🪓
 - Steel Mill: 🏭
@@ -25,50 +23,30 @@ Use this exact emoji set for UI consistency. If a platform lacks a glyph, fall b
 - Magnet Extractor: 🧲
 - Power Plant: ⚡
 - Glassworks: 🪟
-- Plastics Plant: 🧪
+- Polymer Plant: 🧪
 - Concrete Plant: 🧱
 - Silicon Refinery: 💾
-
-### Support Buildings
-- House: 🏠
+- Shelter: 🏠
 - Barracks: 🪖
 - Factory: 🏭
 - Radar Station: 📡
 - Dry Dock: ⚓
 - Airfield: 🛫
-
-### Military Buildings
-- Missile Silo: 🚀
 - Anti-Missile Battery: 🛡️
-- Wall: 🧱
+- Land Mine: 💣
 
 ## Units
-- Soldier: 🪖
+- Infantry: 🪖
+- Special Force: 🎖️
 - Tank: 🛞
 - War Ship: 🚢
+- Submarine: 🚤
 - Fighter Zed: 🛩️
-- Scout Drone: 🛰️
-
-## Research
-- Research in progress: 🧠
-- Completed tech: ✅
-
-## War Room Actions
-- Scout launched: 🛰️
-- Scout detected: 👁️
-- Missile launched: 🚀
-- Missile intercepted: 🛡️
-- Missile hit: 💥
-- Ground assault: ⚔️
-- Nuke: ☢️
-
-## Events and UI Status
-- Building started: 🏗️
-- Building completed: ✅
-- Unit trained: 🪖
-- Research started: 🧠
-- Research completed: ✅
-- Population growth: 👶
-- Population starvation: ☠️
-- Warning/negative net: 🔻
-- At capacity: 🚫
+- Attack Helicopter: 🚁
+- Combat Drone: 🤖
+- Ballistic Missile: 🚀
+- Cruise Missile: 🛰️
+- Scout Drone: 📡
+- Anti-Tank Squad: 🧨
+- Naval Strike Missile: 🚀
+- Air Defence Gun: 🎯
