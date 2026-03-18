@@ -248,7 +248,8 @@ function getTabSignature(game) {
 }
 
 function updateWarRoomDraft(field, value) {
-  state.warRoomDraft[field] = Math.max(0, Number(value || 0));
+  const max = state.game?.you?.units?.[field] ?? Infinity;
+  state.warRoomDraft[field] = Math.max(0, Math.min(Number(value || 0), max));
 }
 
 function getUnitDraft(id) {
@@ -604,6 +605,10 @@ function renderResearch() {
 function renderWarRoom() {
   const scoutState = getQuickActionState('scout');
   const missileState = getQuickActionState('missile');
+  updateWarRoomDraft('soldier', state.warRoomDraft.soldier);
+  updateWarRoomDraft('tank', state.warRoomDraft.tank);
+  updateWarRoomDraft('war_ship', state.warRoomDraft.war_ship);
+  updateWarRoomDraft('fighter_zed', state.warRoomDraft.fighter_zed);
   tabContent.innerHTML = `<h3>War Room</h3>
     <p>Queue actions now. All attacks resolve when the current year ends.</p>
     ${renderPendingActions()}

@@ -77,10 +77,10 @@ Resources are displayed in the top bar with current total and net change for the
   Removed in the current UI to free vertical space for the main panels.  
 
 - **Left Panel**: Event Log  
-  Displays the last 10 important events in chronological order (missile impacts, scout detections, battles, building completions, population deaths, etc.). New events push older ones down. Scouted opponent intel is also surfaced here as blinking red log entries. This panel is intentionally taller than chat so more history stays visible.  
+  Displays the last 10 important events in chronological order (missile impacts, scout detections, battles, building completions, population deaths, etc.). New events push older ones down. Scouted opponent intel is also surfaced here as blinking red log entries. This panel takes roughly two-thirds of the left column height.  
 
 - **Lower Left Panel**: Chat  
-  Real-time chat between the two players. Messages appear instantly in a fixed-height scrollable panel below the event log. No commands except “/surrender” which instantly ends the game in the opponent’s favor.  
+  Real-time chat between the two players. Messages appear instantly in a fixed-height scrollable panel below the event log. This panel takes roughly one-third of the left column height. No commands except “/surrender” which instantly ends the game in the opponent’s favor.  
 
 - **Right Panel**: Command Summary  
   Always-visible summary tables for year/month/timer, resources, buildings, units, and defences. This panel scrolls independently from the center content area.  
@@ -173,6 +173,7 @@ Tier 4 (End-game)
 
 **Ground Assaults**  
 - Select number of soldiers, tanks, war ships, and fighter zeds to commit.
+- The stepper controls in War Room cannot exceed the number of units you currently own in each category.
 - Attacker strength = (soldiers × 10) + (tanks × 25) + (war_ships × 50) + (fighter_zeds × 40).
 - Defender strength = (remaining soldiers × 5) + (tanks × 12) + (war_ships × 25) + (fighter_zeds × 20) + (Wall bonus).
 - Winner loses 30% of committed forces; loser loses 70% of committed forces plus 1–2 random buildings.  

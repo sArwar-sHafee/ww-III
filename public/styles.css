@@ -22,7 +22,8 @@ body {
 #app {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
 }
 
 header {
@@ -135,21 +136,25 @@ button:disabled {
   justify-content: flex-start;
   min-height: 0;
   overflow: hidden;
+  height: 100%;
 }
 
 .chat-panel {
-  height: 220px;
-  min-height: 220px;
+  flex: 1;
+  min-height: 0;
+  height: auto;
 }
 
 .event-panel {
-  flex: 1;
+  flex: 2;
   min-height: 0;
+  overflow: hidden;
 }
 
 .summary-panel {
   flex: 1;
   min-height: 0;
+  height: 100%;
   overflow-y: auto;
 }
 
@@ -330,12 +335,14 @@ button:disabled {
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+  height: 100%;
 }
 
 #tabContent {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .inset {
@@ -381,7 +388,7 @@ button:disabled {
   }
 
   .chat-panel {
-    height: 220px;
+    height: auto;
   }
 }
 
