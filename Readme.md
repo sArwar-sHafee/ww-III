@@ -49,7 +49,7 @@ All game state is stored on the server. Disconnecting does not end the game; the
   - Silicon: 20  
 
 **Core Mechanics – The Year Tick**  
-Every 30 seconds the server performs the following steps in exact order for both players:  
+Every 60 seconds the server performs the following steps in exact order for both players:  
 1. Population consumes nutrition (0.8 nutrition per person).  
 2. All buildings produce their resources (workers assigned to buildings add extra output).  
 3. Units consume their upkeep.  
@@ -61,8 +61,8 @@ Every 30 seconds the server performs the following steps in exact order for both
 **Resource Rules**  
 Resources are displayed in the top bar with current total and net change for the next year.  
 - If net change for any resource is negative, the number turns red.  
-- If a resource reaches 0 or below, it stays at 0 and the number turns red and blinks.  
-- If total storage capacity of all related buildings is reached, the resource number turns red and blinks. Excess production is lost.  
+- If a resource total is 0 or the net change is exactly 0, the number turns solid yellow.  
+- If total storage capacity of all related buildings is reached, the resource remains solid yellow. Excess production is lost.  
 
 **Population Rules**  
 - Base consumption: 0.8 nutrition per person per year.  
@@ -75,51 +75,51 @@ Resources are displayed in the top bar with current total and net change for the
 - **Top Bar** (always visible):  
   Year number | Population (current/max) | Net nutrition change | All resources with emojis and net change (red when negative or at capacity). See `docs/ui/emoji-map.md` for the full emoji set.  
 
-- **Upper Left Panel**: Event Log  
+- **Left Panel**: Event Log  
   Displays the last 10 important events in chronological order (missile impacts, scout detections, battles, building completions, population deaths, etc.). New events push older ones down.  
 
-- **Lower Left Panel**: Chat  
+- **Upper Right Panel**: Chat  
   Real-time chat between the two players. Messages appear instantly. No commands except “/surrender” which instantly ends the game in the opponent’s favor.  
 
-- **Right Sidebar**: Opponent Intel  
+- **Lower Right Panel**: Opponent Intel  
   Shows only scouted information (buildings and approximate resource levels). Updates only when new scouting data arrives.  
 
 - **Main Area**: Six tabs (click to switch)  
   1. Dashboard (overview numbers and big “End Year Early” test button)  
-  2. Economy (assign workers and build resource buildings)  
-  3. Buildings (list all structures with build buttons and progress)  
+  2. Economy (resource buildings only)  
+  3. Buildings (support buildings only)  
   4. Military (train units and build defenses)  
   5. Research (tech tree with progress bars)  
   6. War Room (scout, launch missiles, commit ground assaults)
 
 **Buildings**  
-All buildings take 1–3 years to complete once started. Only one of each type can be built per category unless specified. Workers can be assigned to speed production.  
+All buildings currently take 1–3 months to complete in the shipped prototype. Only one of each type can be built per category unless specified. Workers can be assigned to speed production.  
 
 **Resource Buildings** (Economy tab)  
-- Farm: +4 nutrition per year base. Cost: 15 lumber, 10 steel. Build time: 2 years. Capacity: 200 nutrition.  
-- Lumber Camp: +3 lumber per year base. Cost: 10 lumber, 5 steel. Build time: 1 year. Capacity: 150 lumber.  
-- Steel Mill: +2 steel per year base. Cost: 20 lumber, 10 steel. Build time: 2 years. Capacity: 100 steel.  
-- Alloy Quarry: +1 alloy per year base. Cost: 25 lumber, 15 steel. Build time: 2 years. Capacity: 80 alloy.  
-- Oil Rig: +2 oil per year base. Cost: 30 steel, 20 alloy. Build time: 3 years. Requires Electricity research. Capacity: 100 oil.  
-- Magnet Extractor: +1 magnet per year base. Cost: 40 steel, 15 alloy, 10 oil. Build time: 3 years. Requires Advanced Mining research. Capacity: 60 magnet.  
-- Power Plant: +3 electricity per year base. Cost: 25 steel, 15 oil. Build time: 2 years. Requires Electricity research. Consumes 1 oil per year. Capacity: 80 electricity.  
-- Glassworks: +2 glass per year base. Cost: 15 lumber, 10 steel. Build time: 2 years. Requires Industrial Furnaces research. Capacity: 120 glass.  
-- Plastics Plant: +2 plastic per year base. Cost: 10 steel, 15 oil, 5 electricity. Build time: 2 years. Requires Plastics research. Capacity: 120 plastic.  
-- Concrete Plant: +3 concrete per year base. Cost: 20 lumber, 10 steel, 5 electricity. Build time: 2 years. Requires Industrial Materials research. Capacity: 180 concrete.  
-- Silicon Refinery: +1 silicon per year base. Cost: 20 steel, 10 alloy, 5 electricity. Build time: 3 years. Requires Advanced Mining research. Capacity: 80 silicon.  
+- Farm: +4 nutrition per year base. Cost: 15 lumber, 10 steel. Build time: 2 months. Capacity: 200 nutrition.  
+- Lumber Camp: +3 lumber per year base. Cost: 10 lumber, 5 steel. Build time: 1 month. Capacity: 150 lumber.  
+- Steel Mill: +2 steel per year base. Cost: 20 lumber, 10 steel. Build time: 2 months. Capacity: 100 steel.  
+- Alloy Quarry: +1 alloy per year base. Cost: 25 lumber, 15 steel. Build time: 2 months. Capacity: 80 alloy.  
+- Oil Rig: +2 oil per year base. Cost: 30 steel, 20 alloy. Build time: 3 months. Requires Electricity research. Capacity: 100 oil.  
+- Magnet Extractor: +1 magnet per year base. Cost: 40 steel, 15 alloy, 10 oil. Build time: 3 months. Requires Advanced Mining research. Capacity: 60 magnet.  
+- Power Plant: +3 electricity per year base. Cost: 25 steel, 15 oil. Build time: 2 months. Requires Electricity research. Consumes 1 oil per year. Capacity: 80 electricity.  
+- Glassworks: +2 glass per year base. Cost: 15 lumber, 10 steel. Build time: 2 months. Requires Industrial Furnaces research. Capacity: 120 glass.  
+- Plastics Plant: +2 plastic per year base. Cost: 10 steel, 15 oil, 5 electricity. Build time: 2 months. Requires Plastics research. Capacity: 120 plastic.  
+- Concrete Plant: +3 concrete per year base. Cost: 20 lumber, 10 steel, 5 electricity. Build time: 2 months. Requires Industrial Materials research. Capacity: 180 concrete.  
+- Silicon Refinery: +1 silicon per year base. Cost: 20 steel, 10 alloy, 5 electricity. Build time: 3 months. Requires Advanced Mining research. Capacity: 80 silicon.  
 
 **Support Buildings**  
-- House: +5 population capacity. Cost: 20 lumber, 10 steel. Build time: 1 year.  
-- Barracks: Enables soldier training. Cost: 30 lumber, 20 steel. Build time: 2 years.  
-- Factory: +20% production to all resource buildings when workers assigned. Cost: 40 steel, 25 alloy, 10 oil. Build time: 3 years. Requires Electricity research.  
-- Radar Station: Increases scout accuracy and duration. Cost: 20 steel, 15 alloy, 10 magnet. Build time: 2 years. Requires Advanced Scouting research.  
-- Dry Dock: Enables war ship training. Cost: 40 steel, 25 alloy, 15 oil. Build time: 3 years. Requires Naval Warfare research.
-- Airfield: Enables fighter zed training. Cost: 30 steel, 25 alloy, 10 silicon. Build time: 3 years. Requires Aerial Warfare research.
+- House: +5 population capacity. Cost: 20 lumber, 10 steel. Build time: 1 month.  
+- Barracks: Enables soldier training. Cost: 30 lumber, 20 steel. Build time: 2 months.  
+- Factory: +20% production to all resource buildings when workers assigned. Cost: 40 steel, 25 alloy, 10 oil. Build time: 3 months. Requires Electricity research.  
+- Radar Station: Increases scout accuracy and duration. Cost: 20 steel, 15 alloy, 10 magnet. Build time: 2 months. Requires Advanced Scouting research.  
+- Dry Dock: Enables war ship training. Cost: 40 steel, 25 alloy, 15 oil. Build time: 3 months. Requires Naval Warfare research.
+- Airfield: Enables fighter zed training. Cost: 30 steel, 25 alloy, 10 silicon. Build time: 3 months. Requires Aerial Warfare research.
 
 **Military Buildings** (Military tab)  
-- Missile Silo: Enables missile launches. Cost: 35 steel, 20 oil, 15 alloy. Build time: 3 years. Requires Guided Missiles research. Capacity: 3 missiles stored.  
-- Anti-Missile Battery: 35% chance to intercept incoming missiles. Cost: 30 steel, 15 oil, 10 magnet. Build time: 2 years. Requires Guided Missiles research. One battery protects the entire base.  
-- Wall: Reduces ground assault damage by 40%. Cost: 50 lumber, 30 steel. Build time: 2 years.  
+- Missile Silo: Enables missile launches. Cost: 35 steel, 20 oil, 15 alloy. Build time: 3 months. Requires Guided Missiles research. Capacity: 3 missiles stored.  
+- Anti-Missile Battery: 35% chance to intercept incoming missiles. Cost: 30 steel, 15 oil, 10 magnet. Build time: 2 months. Requires Guided Missiles research. One battery protects the entire base.  
+- Wall: Reduces ground assault damage by 40%. Cost: 50 lumber, 30 steel. Build time: 2 months.  
 
 **Units** (Military tab)  
 - Soldier: Cost: 8 nutrition, 4 steel. Upkeep: 0.5 nutrition per year. Attack power: 10.  
@@ -129,27 +129,27 @@ All buildings take 1–3 years to complete once started. Only one of each type c
 - Scout Drone: Cost: 5 oil, 3 electricity. Upkeep: 1 electricity per year. Reveals exact opponent buildings and resources for 2 years. Cooldown: 1 year.  
 
 **Research Tree** (Research tab)  
-Research is unlocked sequentially. Each level costs alloy and time.  
+Research is unlocked sequentially. Each level costs alloy and currently resolves in months in the shipped prototype.  
 
 Tier 1 (Year 3+ availability)  
-- Basic Tools: +20% production on all buildings. Cost: 15 alloy. Time: 2 years.  
+- Basic Tools: +20% production on all buildings. Cost: 15 alloy. Time: 2 months.  
 
 Tier 2  
-- Electricity: Unlocks Power Plants and Oil Rigs. Cost: 25 alloy, 5 magnet. Time: 3 years.  
-- Guided Missiles: Unlocks Missile Silos and Anti-Missile Batteries. Cost: 30 alloy, 10 magnet. Time: 3 years.  
-- Industrial Furnaces: Unlocks Glassworks. Cost: 20 alloy, 5 steel. Time: 2 years.  
+- Electricity: Unlocks Power Plants and Oil Rigs. Cost: 25 alloy, 5 magnet. Time: 3 months.  
+- Guided Missiles: Unlocks Missile Silos and Anti-Missile Batteries. Cost: 30 alloy, 10 magnet. Time: 3 months.  
+- Industrial Furnaces: Unlocks Glassworks. Cost: 20 alloy, 5 steel. Time: 2 months.  
 
 Tier 3  
-- Advanced Mining: Unlocks Magnet Extractors. Cost: 35 alloy, 15 magnet. Time: 3 years.  
-- Tanks: Unlocks tank training. Cost: 40 alloy, 20 magnet. Time: 4 years.  
-- Advanced Scouting: Improves scout drone accuracy. Cost: 25 alloy, 10 magnet. Time: 2 years.  
-- Plastics: Unlocks Plastics Plant. Cost: 30 alloy, 10 oil. Time: 3 years.  
-- Industrial Materials: Unlocks Concrete Plant. Cost: 20 alloy, 5 steel, 5 electricity. Time: 2 years.  
-- Naval Warfare: Unlocks war ship training. Cost: 50 alloy, 25 magnet. Time: 4 years.
-- Aerial Warfare: Unlocks fighter zed training. Cost: 50 alloy, 25 silicon. Time: 4 years.
+- Advanced Mining: Unlocks Magnet Extractors. Cost: 35 alloy, 15 magnet. Time: 3 months.  
+- Tanks: Unlocks tank training. Cost: 40 alloy, 20 magnet. Time: 4 months.  
+- Advanced Scouting: Improves scout drone accuracy. Cost: 25 alloy, 10 magnet. Time: 2 months.  
+- Plastics: Unlocks Plastics Plant. Cost: 30 alloy, 10 oil. Time: 3 months.  
+- Industrial Materials: Unlocks Concrete Plant. Cost: 20 alloy, 5 steel, 5 electricity. Time: 2 months.  
+- Naval Warfare: Unlocks war ship training. Cost: 50 alloy, 25 magnet. Time: 4 months.
+- Aerial Warfare: Unlocks fighter zed training. Cost: 50 alloy, 25 silicon. Time: 4 months.
 
 Tier 4 (End-game)  
-- Nuclear Technology: Unlocks Nuke in War Room. Cost: 100 alloy, 50 magnet, 30 electricity. Time: 5 years.  
+- Nuclear Technology: Unlocks Nuke in War Room. Cost: 100 alloy, 50 magnet, 30 electricity. Time: 5 months.  
 
 **War Room Mechanics**  
 **Scouting**  

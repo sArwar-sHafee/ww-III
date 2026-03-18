@@ -103,8 +103,10 @@ function getPhaseLabel() {
 }
 
 function getCountdownSeconds() {
-  if (!state.game?.tickEndsAt) return 0;
-  return Math.max(0, Math.ceil((state.game.tickEndsAt - Date.now()) / 1000));
+  if (!state.game) return 0;
+  const targetTime = state.game.phase === 'active' ? state.game.yearEndsAt : state.game.tickEndsAt;
+  if (!targetTime) return 0;
+  return Math.max(0, Math.ceil((targetTime - Date.now()) / 1000));
 }
 
 function getConnectionLabel() {
@@ -155,6 +157,10 @@ function formatDelta(value) {
   return `${value >= 0 ? '+' : ''}${Math.floor(value)}`;
 }
 
+function ticksToMonths(ticks) {
+  return Math.max(1, Math.ceil(ticks / (state.meta?.ticksPerMonth || 5)));
+}
+
 function renderTopBar() {
   if (!state.game || !state.meta) return;
   const you = state.game.you;
@@ -170,8 +176,9 @@ function renderTopBar() {
     const capacity = getResourceCapacity(resource, you.buildings);
     const isCapped = Number.isFinite(capacity) && value >= capacity;
     let cls = '';
-    if (value <= 0 || net < 0) cls = 'red';
-    if (isCapped) cls = 'red blink';
+    if (value <= 0 || net === 0) cls = 'yellow';
+    if (net < 0) cls = 'red';
+    if (isCapped) cls = 'yellow';
     items.push(`<span class="${cls}">${emojis[resource]} ${resource}: <b>${value}</b> <small>(${formatDelta(net)})</small></span>`);
   }
 
@@ -345,14 +352,16 @@ function renderDashboard() {
 
 function renderEconomyOrBuildings() {
   const you = state.game.you;
-  const ids = Object.keys(state.meta.buildings).filter((id) => state.tab === 'economy' ? state.meta.buildings[id].category === 'economy' : true);
+  const ids = Object.keys(state.meta.buildings).filter((id) => state.tab === 'economy'
+    ? state.meta.buildings[id].category === 'economy'
+    : state.meta.buildings[id].category === 'support');
   tabContent.innerHTML = `<h3>${state.tab === 'economy' ? 'Economy' : 'Buildings'}</h3><div class="action-grid">` + ids.map((id) => {
     const building = state.meta.buildings[id];
     const cardState = getBuildCardState(id);
-    const label = cardState.inQueue ? `Building... (${Math.ceil(cardState.inQueue.ticksRemaining / 5)} months)` : 'Build';
+    const label = cardState.inQueue ? `Building... (${ticksToMonths(cardState.inQueue.ticksRemaining)} months)` : 'Build';
     return `<div class="card">
       <b>${emojis[id] || ''} ${building.name}</b>
-      <div class="small">Owned: ${you.buildings[id]} | Build time: ${building.buildTime} years</div>
+      <div class="small">Owned: ${you.buildings[id]} | Build time: ${building.buildTime} months</div>
       <div class="small">Cost: ${costLine(building.cost)}</div>
       ${renderReasons(cardState.reasons)}
       ${actionBtn(label, () => sendAction('build', { id }), { disabled: cardState.disabled, title: cardState.reasons.join(' | ') })}
@@ -391,10 +400,10 @@ function renderMilitary() {
   html += defenseIds.map((id) => {
     const building = state.meta.buildings[id];
     const cardState = getBuildCardState(id);
-    const label = cardState.inQueue ? `Building... (${Math.ceil(cardState.inQueue.ticksRemaining / 5)} months)` : 'Build';
+    const label = cardState.inQueue ? `Building... (${ticksToMonths(cardState.inQueue.ticksRemaining)} months)` : 'Build';
     return `<div class="card">
       <b>${emojis[id] || ''} ${building.name}</b>
-      <div class="small">Owned: ${you.buildings[id]} | Build time: ${building.buildTime} years</div>
+      <div class="small">Owned: ${you.buildings[id]} | Build time: ${building.buildTime} months</div>
       <div class="small">Cost: ${costLine(building.cost)}</div>
       ${renderReasons(cardState.reasons)}
       ${actionBtn(label, () => sendAction('build', { id }), { disabled: cardState.disabled, title: cardState.reasons.join(' | ') })}
@@ -435,15 +444,15 @@ function renderMilitary() {
 function renderResearch() {
   const you = state.game.you;
   tabContent.innerHTML = `<h3>Research</h3>
-    <div class="small">Active: ${you.research.active ? `${state.meta.research[you.research.active.id].name} (${Math.ceil(you.research.active.ticksRemaining / 5)} months left)` : 'None'}</div>
+    <div class="small">Active: ${you.research.active ? `${state.meta.research[you.research.active.id].name} (${ticksToMonths(you.research.active.ticksRemaining)} months left)` : 'None'}</div>
     <div class="action-grid">` +
     Object.entries(state.meta.research).map(([id, tech]) => {
       const cardState = getResearchCardState(id);
-      const progress = cardState.isCurrent ? Math.max(0, 100 - Math.floor((you.research.active.ticksRemaining / (tech.years * 60)) * 100)) : (you.research.completed.includes(id) ? 100 : 0);
+      const progress = cardState.isCurrent ? Math.max(0, 100 - Math.floor((you.research.active.ticksRemaining / (tech.years * (state.meta?.ticksPerMonth || 5))) * 100)) : (you.research.completed.includes(id) ? 100 : 0);
       const label = cardState.isCurrent ? `Researching... ${progress}%` : 'Start';
       return `<div class="card">
         <b>${tech.name}</b>
-        <div class="small">Cost: ${costLine(tech.cost)} | ${tech.years} years</div>
+        <div class="small">Cost: ${costLine(tech.cost)} | ${tech.years} months</div>
         <div class="small">Progress: ${progress}%</div>
         <div class="progress"><span style="width:${progress}%"></span></div>
         ${renderReasons(cardState.reasons)}

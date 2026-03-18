@@ -138,7 +138,19 @@ button:disabled {
   margin-top: 2rem;
 }
 
-.left { display: grid; gap: 1rem; grid-template-rows: 1fr 300px; }
+.left,
+.right {
+  display: grid;
+  gap: 1rem;
+}
+
+.left {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.right {
+  grid-template-rows: minmax(260px, 1fr) minmax(220px, auto);
+}
 
 #events {
   list-style: none;
@@ -154,6 +166,11 @@ button:disabled {
 }
 
 #events li.error { color: var(--accent-red); }
+
+#chat,
+#events {
+  min-height: 0;
+}
 
 #chat {
   flex: 1;
@@ -319,7 +336,9 @@ button:disabled {
   .layout {
     grid-template-columns: 1fr;
   }
-  .left { grid-template-rows: auto auto; }
+  .right {
+    grid-template-rows: auto auto;
+  }
 }
 
 @media (max-width: 720px) {

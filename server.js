@@ -92,6 +92,14 @@ function getRoomPhase(room) {
   return 'active';
 }
 
+function getYearEndsAt(room) {
+  const phase = getRoomPhase(room);
+  if (phase !== 'active') return room.tickEndsAt;
+  const ticksIntoYear = room.ticks % TICKS_PER_YEAR;
+  const ticksLeftInYear = ticksIntoYear === 0 ? TICKS_PER_YEAR : TICKS_PER_YEAR - ticksIntoYear;
+  return Date.now() + ticksLeftInYear * TICK_MS;
+}
+
 function appendEvent(player, year, message, type = 'info') {
   player.eventLog.unshift({ year, message, type });
   player.eventLog = player.eventLog.slice(0, 10);
@@ -310,6 +318,7 @@ function stripStateFor(room, playerId) {
     month: room.month,
     phase: getRoomPhase(room),
     tickEndsAt: room.tickEndsAt,
+    yearEndsAt: getYearEndsAt(room),
     winner: room.winner,
     you: {
       playerId: p.playerId,
@@ -484,7 +493,7 @@ const server = http.createServer(async (req, res) => {
           return writeJson(res, 400, { error: 'Insufficient resources' });
         }
         payCost(p.resources, cfg.cost);
-        p.buildingQueues.push({ id: payload.id, ticksRemaining: cfg.buildTime * TICKS_PER_YEAR });
+        p.buildingQueues.push({ id: payload.id, ticksRemaining: cfg.buildTime * TICKS_PER_MONTH });
         appendEvent(p, room.year, `🏗️ Started ${cfg.name}`);
       } else if (type === 'train') {
         const unit = UNITS[payload.id];
@@ -526,7 +535,7 @@ const server = http.createServer(async (req, res) => {
           return writeJson(res, 400, { error: 'Insufficient resources' });
         }
         payCost(p.resources, tech.cost);
-        p.research.active = { id: payload.id, ticksRemaining: tech.years * TICKS_PER_YEAR };
+        p.research.active = { id: payload.id, ticksRemaining: tech.years * TICKS_PER_MONTH };
         appendEvent(p, room.year, `🧠 Started research: ${tech.name}`);
       } else if (type === 'chat') {
         const msg = String(payload.text || '').slice(0, 240);
@@ -559,7 +568,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === '/api/meta' && req.method === 'GET') {
-      return writeJson(res, 200, { buildings: BUILDINGS, units: UNITS, research: RESEARCH, resources: RESOURCE_KEYS, tickMs: TICK_MS });
+      return writeJson(res, 200, { buildings: BUILDINGS, units: UNITS, research: RESEARCH, resources: RESOURCE_KEYS, tickMs: TICK_MS, ticksPerMonth: TICKS_PER_MONTH, ticksPerYear: TICKS_PER_YEAR });
     }
 
     let filePath = url.pathname === '/' ? '/index.html' : url.pathname;
