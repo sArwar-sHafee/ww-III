@@ -77,21 +77,23 @@ Resources are displayed in the top bar with current total and net change for the
   Year number | Population (current/max) | Net nutrition change | All resources with emojis and net change (red when negative, yellow when depleted or capped). See `docs/ui/emoji-map.md` for the full emoji set.  
 
 - **Left Panel**: Event Log  
-  Displays the last 10 important events in chronological order (missile impacts, scout detections, battles, building completions, population deaths, etc.). New events push older ones down.  
+  Displays the last 10 important events in chronological order (missile impacts, scout detections, battles, building completions, population deaths, etc.). New events push older ones down. This panel is intentionally taller than chat so more history stays visible.  
 
 - **Upper Right Panel**: Chat  
-  Real-time chat between the two players. Messages appear instantly in a fixed-height scrollable panel. No commands except “/surrender” which instantly ends the game in the opponent’s favor.  
+  Real-time chat between the two players. Messages appear instantly in a slightly smaller fixed-height scrollable panel. No commands except “/surrender” which instantly ends the game in the opponent’s favor.  
 
 - **Lower Right Panel**: Opponent Intel  
   Shows only scouted information (buildings and approximate resource levels). Updates only when new scouting data arrives, and sits directly below chat without a large empty gap.  
 
-- **Main Area**: Six tabs (click to switch)  
+- **Main Area**: Eight tabs (click to switch)  
   1. Dashboard (overview numbers and surrender button)  
   2. Economy (resource buildings only)  
   3. Buildings (support buildings only)  
-  4. Military (train units and build defenses)  
-  5. Research (tech tree with progress bars)  
-  6. War Room (queued actions, scout, launch missiles, commit ground assaults)
+  4. Table View (resources, buildings, and units in compact tables)  
+  5. Military (train military units only)  
+  6. Defences (build defensive structures only)  
+  7. Research (tech tree with progress bars)  
+  8. War Room (queued actions, scout, launch missiles, commit ground assaults)
 
 **Buildings**  
 All buildings currently take 1–3 months to complete in the shipped prototype. Only one of each type can be built per category unless specified. Workers can be assigned to speed production.  

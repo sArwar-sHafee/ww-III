@@ -147,6 +147,7 @@ button:disabled {
 
 .left {
   min-height: 0;
+  flex: 1;
 }
 
 .right {
@@ -154,13 +155,18 @@ button:disabled {
 }
 
 .chat-panel {
-  height: 320px;
-  min-height: 320px;
+  height: 260px;
+  min-height: 260px;
 }
 
 .intel-panel {
   min-height: 280px;
   flex: 1;
+}
+
+.left .panel {
+  flex: 1;
+  min-height: 0;
 }
 
 #events {
@@ -222,6 +228,24 @@ button:disabled {
 .split-panels {
   display: grid;
   gap: 1rem;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.data-table th,
+.data-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  text-align: left;
+}
+
+.data-table th {
+  color: var(--text-dim);
+  font-weight: 600;
 }
 
 .card {
@@ -357,7 +381,7 @@ button:disabled {
   }
 
   .chat-panel {
-    height: 320px;
+    height: 260px;
   }
 }
 

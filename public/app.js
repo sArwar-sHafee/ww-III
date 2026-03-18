@@ -14,6 +14,7 @@ const state = {
   notice: null,
   noticeTimer: null,
   lastTabSignature: null,
+  forceTabRefresh: false,
   warRoomDraft: { soldier: 10, tank: 1, war_ship: 0, fighter_zed: 0 }
 };
 
@@ -26,7 +27,7 @@ const emojis = {
   missile_silo: '🚀', anti_missile_battery: '🛡️', wall: '🧱',
   soldier: '🪖', tank: '🛞', war_ship: '🚢', fighter_zed: '🛩️', scout_drone: '🛰️'
 };
-const tabs = ['dashboard', 'economy', 'buildings', 'military', 'research', 'war_room'];
+const tabs = ['dashboard', 'economy', 'buildings', 'table_view', 'military', 'defences', 'research', 'war_room'];
 
 const topBar = document.getElementById('topBar');
 const eventsEl = document.getElementById('events');
@@ -191,34 +192,19 @@ function getTabSignature(game) {
   }
 
   if (state.tab === 'economy' || state.tab === 'buildings') {
-    return JSON.stringify({
-      phase,
-      buildings: you.buildings,
-      buildingQueues: you.buildingQueues,
-      research: you.research.completed,
-      resources: flooredResources(you.resources)
-    });
+    return JSON.stringify({ phase, year });
   }
 
   if (state.tab === 'military') {
-    return JSON.stringify({
-      phase,
-      units: you.units,
-      buildings: you.buildings,
-      buildingQueues: you.buildingQueues,
-      research: you.research.completed,
-      resources: flooredResources(you.resources)
-    });
+    return JSON.stringify({ phase, year });
+  }
+
+  if (state.tab === 'defences') {
+    return JSON.stringify({ phase, year });
   }
 
   if (state.tab === 'research') {
-    return JSON.stringify({
-      phase,
-      year,
-      active: you.research.active,
-      completed: you.research.completed,
-      resources: flooredResources(you.resources)
-    });
+    return JSON.stringify({ phase, year });
   }
 
   if (state.tab === 'war_room') {
@@ -233,11 +219,22 @@ function getTabSignature(game) {
     });
   }
 
+  if (state.tab === 'table_view') {
+    return JSON.stringify({ phase, year });
+  }
+
   return JSON.stringify({ phase, year });
 }
 
 function updateWarRoomDraft(field, value) {
   state.warRoomDraft[field] = Math.max(0, Number(value || 0));
+}
+
+function getResourceStateClass(value, net) {
+  if (value <= 0 && net < 0) return 'red blink';
+  if (net < 0) return 'red';
+  if (value <= 0) return 'yellow';
+  return '';
 }
 
 function renderTopBar() {
@@ -252,10 +249,7 @@ function renderTopBar() {
   for (const resource of state.meta.resources) {
     const value = Math.floor(you.resources[resource]);
     const net = you.net?.[resource] ?? 0;
-    let cls = '';
-    if (value <= 0 && net < 0) cls = 'red blink';
-    else if (net < 0) cls = 'red';
-    else if (value <= 0) cls = 'yellow';
+    const cls = getResourceStateClass(value, net);
     items.push(`<span class="${cls}">${emojis[resource]} ${resource}: <b>${value}</b> <small>(${formatDelta(net)})</small></span>`);
   }
 
@@ -462,7 +456,6 @@ function renderEconomyOrBuildings() {
 function renderMilitary() {
   const you = state.game.you;
   const unitIds = Object.keys(state.meta.units);
-  const defenseIds = ['missile_silo', 'anti_missile_battery', 'wall'];
   const unitsHtml = unitIds.map((id) => {
     const unit = state.meta.units[id];
     const unitState = getUnitCardState(id);
@@ -480,6 +473,17 @@ function renderMilitary() {
       </div>
     </div>`;
   }).join('');
+  tabContent.innerHTML = `
+    <div class="panel inset">
+      <h3>Military Units</h3>
+      <div class="action-grid">${unitsHtml}</div>
+    </div>
+  `;
+}
+
+function renderDefences() {
+  const you = state.game.you;
+  const defenseIds = ['missile_silo', 'anti_missile_battery', 'wall'];
   const defensesHtml = defenseIds.map((id) => {
     const building = state.meta.buildings[id];
     const cardState = getBuildCardState(id);
@@ -495,14 +499,52 @@ function renderMilitary() {
   }).join('');
 
   tabContent.innerHTML = `
+    <div class="panel inset">
+      <h3>Defences</h3>
+      <div class="action-grid">${defensesHtml}</div>
+    </div>
+  `;
+}
+
+function renderTableView() {
+  const you = state.game.you;
+  const resourceRows = state.meta.resources.map((resource) => {
+    const value = Math.floor(you.resources[resource]);
+    const net = you.net?.[resource] ?? 0;
+    const cls = getResourceStateClass(value, net);
+    return `<tr class="${cls}"><td>${emojis[resource] || ''} ${resource}</td><td>${value}</td><td>${formatDelta(net)}</td></tr>`;
+  }).join('');
+
+  const buildingRows = Object.entries(state.meta.buildings).map(([id, building]) => `
+    <tr><td>${emojis[id] || ''} ${building.name}</td><td>${building.category}</td><td>${you.buildings[id]}</td></tr>
+  `).join('');
+
+  const unitRows = Object.entries(state.meta.units).map(([id, unit]) => `
+    <tr><td>${emojis[id] || ''} ${unit.name}</td><td>${you.units[id]}</td></tr>
+  `).join('');
+
+  tabContent.innerHTML = `
     <div class="split-panels">
       <div class="panel inset">
-        <h3>Military Units</h3>
-        <div class="action-grid">${unitsHtml}</div>
+        <h3>Resources</h3>
+        <table class="data-table">
+          <thead><tr><th>Resource</th><th>Total</th><th>Net</th></tr></thead>
+          <tbody>${resourceRows}</tbody>
+        </table>
       </div>
       <div class="panel inset">
-        <h3>Defenses</h3>
-        <div class="action-grid">${defensesHtml}</div>
+        <h3>Buildings</h3>
+        <table class="data-table">
+          <thead><tr><th>Building</th><th>Category</th><th>Owned</th></tr></thead>
+          <tbody>${buildingRows}</tbody>
+        </table>
+      </div>
+      <div class="panel inset">
+        <h3>Units</h3>
+        <table class="data-table">
+          <thead><tr><th>Unit</th><th>Owned</th></tr></thead>
+          <tbody>${unitRows}</tbody>
+        </table>
       </div>
     </div>
   `;
@@ -570,7 +612,9 @@ function renderTab() {
   if (!state.game?.you) return;
   if (state.tab === 'dashboard') return renderDashboard();
   if (state.tab === 'economy' || state.tab === 'buildings') return renderEconomyOrBuildings();
+  if (state.tab === 'table_view') return renderTableView();
   if (state.tab === 'military') return renderMilitary();
+  if (state.tab === 'defences') return renderDefences();
   if (state.tab === 'research') return renderResearch();
   if (state.tab === 'war_room') return renderWarRoom();
 }
@@ -578,6 +622,7 @@ function renderTab() {
 async function sendAction(type, payload) {
   try {
     await api('/api/action', { roomId: state.roomId, playerId: state.playerId, type, payload });
+    state.forceTabRefresh = true;
     setNotice(null);
   } catch (error) {
     setNotice(error.message, 'error');
@@ -590,6 +635,7 @@ function drawTabs() {
     button.addEventListener('click', () => {
       state.tab = button.dataset.tab;
       state.lastTabSignature = null;
+      state.forceTabRefresh = true;
       setNotice(null);
       drawTabs();
       renderTab();
@@ -607,9 +653,10 @@ function renderAll() {
   renderIntel();
   const nextSignature = getTabSignature(state.game);
   if (!tabsEl.children.length) drawTabs();
-  if (state.lastTabSignature !== nextSignature) {
+  if (state.forceTabRefresh || state.lastTabSignature !== nextSignature) {
     renderTab();
     state.lastTabSignature = nextSignature;
+    state.forceTabRefresh = false;
   }
 }
 
@@ -621,6 +668,7 @@ function applyGameState(game) {
     clearSession();
     setupEl.classList.remove('hidden');
     state.lastTabSignature = null;
+    state.forceTabRefresh = true;
   } else {
     saveSession();
   }
