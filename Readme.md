@@ -64,7 +64,6 @@ Resources are displayed in the top bar with current total and net change for the
 - If a resource total reaches 0, the number turns solid yellow.  
 - If a resource is both at 0 and still has a negative net change, the number blinks red.  
 - If the net change is exactly 0 but the resource total is above 0, the number stays normal.  
-- If total storage capacity of all related buildings is reached, the resource remains solid yellow. Excess production is lost.  
 
 **Population Rules**  
 - Base consumption: 0.8 nutrition per person per year.  
@@ -84,7 +83,7 @@ Resources are displayed in the top bar with current total and net change for the
   Real-time chat between the two players. Messages appear instantly in a fixed-height scrollable panel. No commands except “/surrender” which instantly ends the game in the opponent’s favor.  
 
 - **Lower Right Panel**: Opponent Intel  
-  Shows only scouted information (buildings and approximate resource levels). Updates only when new scouting data arrives.  
+  Shows only scouted information (buildings and approximate resource levels). Updates only when new scouting data arrives, and sits directly below chat without a large empty gap.  
 
 - **Main Area**: Six tabs (click to switch)  
   1. Dashboard (overview numbers and surrender button)  
@@ -98,7 +97,7 @@ Resources are displayed in the top bar with current total and net change for the
 All buildings currently take 1–3 months to complete in the shipped prototype. Only one of each type can be built per category unless specified. Workers can be assigned to speed production.  
 
 **Resource Buildings** (Economy tab)  
-Each card shows cost, build time, and the resource output or upkeep it contributes per year.
+Each card shows cost, build time, and the resource output or upkeep it contributes per year with the matching resource emoji.
 
 - Farm: +4 nutrition per year base. Cost: 15 lumber, 10 steel. Build time: 2 months. Capacity: 200 nutrition.  
 - Lumber Camp: +3 lumber per year base. Cost: 10 lumber, 5 steel. Build time: 1 month. Capacity: 150 lumber.  
@@ -145,7 +144,7 @@ Tier 2
 
 Tier 3  
 - Advanced Mining: Unlocks Magnet Extractors. Cost: 35 alloy, 15 magnet. Time: 3 months.  
-- Tanks: Unlocks tank training. Cost: 40 alloy, 20 magnet. Time: 4 months.  
+- Tank Technology: Unlocks tank training. Cost: 40 alloy, 20 magnet. Time: 4 months.  
 - Advanced Scouting: Improves scout drone accuracy. Cost: 25 alloy, 10 magnet. Time: 2 months.  
 - Plastics: Unlocks Plastics Plant. Cost: 30 alloy, 10 oil. Time: 3 months.  
 - Industrial Materials: Unlocks Concrete Plant. Cost: 20 alloy, 5 steel, 5 electricity. Time: 2 months.  

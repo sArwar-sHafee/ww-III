@@ -52,7 +52,7 @@ const RESEARCH = {
   guided_missiles: { name: 'Guided Missiles', cost: { alloy: 30, magnet: 10 }, years: 3, prereq: 'basic_tools' },
   industrial_furnaces: { name: 'Industrial Furnaces', cost: { alloy: 20, steel: 5 }, years: 2, prereq: 'basic_tools' },
   advanced_mining: { name: 'Advanced Mining', cost: { alloy: 35, magnet: 15 }, years: 3, prereq: 'electricity' },
-  tanks: { name: 'Tanks', cost: { alloy: 40, magnet: 20 }, years: 4, prereq: 'guided_missiles' },
+  tanks: { name: 'Tank Technology', cost: { alloy: 40, magnet: 20 }, years: 4, prereq: 'guided_missiles' },
   naval_warfare: { name: 'Naval Warfare', cost: { alloy: 40, magnet: 20 }, years: 4, prereq: 'basic_tools' },
   aerial_warfare: { name: 'Aerial Warfare', cost: { alloy: 50, silicon: 20 }, years: 4, prereq: 'electricity' },
   advanced_scouting: { name: 'Advanced Scouting', cost: { alloy: 25, magnet: 10 }, years: 2, prereq: 'industrial_furnaces' },

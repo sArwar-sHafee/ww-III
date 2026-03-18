@@ -252,12 +252,10 @@ function renderTopBar() {
   for (const resource of state.meta.resources) {
     const value = Math.floor(you.resources[resource]);
     const net = you.net?.[resource] ?? 0;
-    const capacity = getResourceCapacity(resource, you.buildings);
-    const isCapped = Number.isFinite(capacity) && value >= capacity;
     let cls = '';
     if (value <= 0 && net < 0) cls = 'red blink';
     else if (net < 0) cls = 'red';
-    else if (value <= 0 || isCapped) cls = 'yellow';
+    else if (value <= 0) cls = 'yellow';
     items.push(`<span class="${cls}">${emojis[resource]} ${resource}: <b>${value}</b> <small>(${formatDelta(net)})</small></span>`);
   }
 
@@ -298,9 +296,13 @@ function costLine(cost) {
 
 function productionLine(building) {
   const entries = [];
-  for (const [key, value] of Object.entries(building.production || {})) entries.push(`${key}: ${value}/year`);
-  for (const [key, value] of Object.entries(building.upkeep || {})) entries.push(`${key}: -${value}/year`);
-  return entries.length ? entries.join(', ') : 'No direct production';
+  for (const [key, value] of Object.entries(building.production || {})) entries.push(`${emojis[key] || ''}${key}: ${value}/year`);
+  for (const [key, value] of Object.entries(building.upkeep || {})) entries.push(`${emojis[key] || ''}${key}: -${value}/year`);
+  return entries.join(', ');
+}
+
+function techLabel(id) {
+  return state.meta?.research?.[id]?.name || id.replace(/_/g, ' ');
 }
 
 function getMissingCost(cost, amount = 1) {
@@ -317,7 +319,7 @@ function getBuildCardState(id) {
   const reasons = [];
   if (state.game.phase !== 'active') reasons.push('Match not active');
   if (inQueue) reasons.push('Already building');
-  if (building.requires && !building.requires.every((tech) => you.research.completed.includes(tech))) reasons.push(`Needs ${building.requires.join(', ')}`);
+  if (building.requires && !building.requires.every((tech) => you.research.completed.includes(tech))) reasons.push(`Needs ${building.requires.map(techLabel).join(', ')}`);
   const missing = getMissingCost(building.cost);
   if (missing.length) reasons.push(`Missing ${missing.join(', ')}`);
   return { disabled: reasons.length > 0, reasons, inQueue };
@@ -329,7 +331,7 @@ function getUnitCardState(id, amount = 1) {
   const reasons = [];
   if (state.game.phase !== 'active') reasons.push('Match not active');
   if (unit.requiresBuilding && you.buildings[unit.requiresBuilding] <= 0) reasons.push(`Needs ${unit.requiresBuilding.replace(/_/g, ' ')}`);
-  if (unit.requiresTech && !you.research.completed.includes(unit.requiresTech)) reasons.push(`Needs ${unit.requiresTech.replace(/_/g, ' ')}`);
+  if (unit.requiresTech && !you.research.completed.includes(unit.requiresTech)) reasons.push(`Needs ${techLabel(unit.requiresTech)}`);
   const missing = getMissingCost(unit.cost, amount);
   if (missing.length) reasons.push(`Missing ${missing.join(', ')}`);
   return { disabled: reasons.length > 0, reasons };
@@ -344,7 +346,7 @@ function getResearchCardState(id) {
   if (you.research.completed.includes(id)) reasons.push('Completed');
   if (you.research.active && !isCurrent) reasons.push('Research in progress');
   if (tech.minYear && state.game.year < tech.minYear) reasons.push(`Available Year ${tech.minYear}`);
-  if (tech.prereq && !you.research.completed.includes(tech.prereq)) reasons.push(`Needs ${tech.prereq.replace(/_/g, ' ')}`);
+  if (tech.prereq && !you.research.completed.includes(tech.prereq)) reasons.push(`Needs ${techLabel(tech.prereq)}`);
   const missing = getMissingCost(tech.cost);
   if (missing.length && !isCurrent) reasons.push(`Missing ${missing.join(', ')}`);
   return { disabled: reasons.length > 0, reasons, isCurrent };
@@ -450,7 +452,7 @@ function renderEconomyOrBuildings() {
       <b>${emojis[id] || ''} ${building.name}</b>
       <div class="small">Owned: ${you.buildings[id]} | Build time: ${building.buildTime} months</div>
       <div class="small">Cost: ${costLine(building.cost)}</div>
-      <div class="small">Output: ${productionLine(building)}</div>
+      ${productionLine(building) ? `<div class="small">Output: ${productionLine(building)}</div>` : ''}
       ${renderReasons(cardState.reasons)}
       ${actionBtn(label, () => sendAction('build', { id }), { disabled: cardState.disabled, title: cardState.reasons.join(' | ') })}
     </div>`;
@@ -461,9 +463,7 @@ function renderMilitary() {
   const you = state.game.you;
   const unitIds = Object.keys(state.meta.units);
   const defenseIds = ['missile_silo', 'anti_missile_battery', 'wall'];
-
-  let html = '<h3>Military Units</h3><div class="action-grid">';
-  html += unitIds.map((id) => {
+  const unitsHtml = unitIds.map((id) => {
     const unit = state.meta.units[id];
     const unitState = getUnitCardState(id);
     return `<div class="card">
@@ -480,10 +480,7 @@ function renderMilitary() {
       </div>
     </div>`;
   }).join('');
-  html += '</div>';
-
-  html += '<h3>Defenses</h3><div class="action-grid">';
-  html += defenseIds.map((id) => {
+  const defensesHtml = defenseIds.map((id) => {
     const building = state.meta.buildings[id];
     const cardState = getBuildCardState(id);
     const label = cardState.inQueue ? `Building... (${ticksToMonths(cardState.inQueue.ticksRemaining)} months)` : 'Build';
@@ -491,14 +488,24 @@ function renderMilitary() {
       <b>${emojis[id] || ''} ${building.name}</b>
       <div class="small">Owned: ${you.buildings[id]} | Build time: ${building.buildTime} months</div>
       <div class="small">Cost: ${costLine(building.cost)}</div>
-      <div class="small">Output: ${productionLine(building)}</div>
+      ${productionLine(building) ? `<div class="small">Output: ${productionLine(building)}</div>` : ''}
       ${renderReasons(cardState.reasons)}
       ${actionBtn(label, () => sendAction('build', { id }), { disabled: cardState.disabled, title: cardState.reasons.join(' | ') })}
     </div>`;
   }).join('');
-  html += '</div>';
 
-  tabContent.innerHTML = html;
+  tabContent.innerHTML = `
+    <div class="split-panels">
+      <div class="panel inset">
+        <h3>Military Units</h3>
+        <div class="action-grid">${unitsHtml}</div>
+      </div>
+      <div class="panel inset">
+        <h3>Defenses</h3>
+        <div class="action-grid">${defensesHtml}</div>
+      </div>
+    </div>
+  `;
 }
 
 function renderResearch() {
