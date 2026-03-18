@@ -11,7 +11,8 @@ const state = {
   pollTimer: null,
   es: null,
   connection: 'idle',
-  notice: null
+  notice: null,
+  noticeTimer: null
 };
 
 const DEFAULT_API_ORIGIN = 'https://ww-iii.onrender.com';
@@ -59,7 +60,14 @@ async function api(path, body) {
 }
 
 function setNotice(message, type = 'info') {
+  clearTimeout(state.noticeTimer);
   state.notice = message ? { message, type } : null;
+  if (message && (type === 'success' || type === 'info')) {
+    state.noticeTimer = setTimeout(() => {
+      state.notice = null;
+      renderStatusBanner();
+    }, 3500);
+  }
   renderStatusBanner();
 }
 
@@ -74,6 +82,7 @@ function saveSession() {
 }
 
 function clearSession() {
+  clearTimeout(state.noticeTimer);
   localStorage.removeItem(SESSION_KEY);
 }
 
@@ -176,9 +185,9 @@ function renderTopBar() {
     const capacity = getResourceCapacity(resource, you.buildings);
     const isCapped = Number.isFinite(capacity) && value >= capacity;
     let cls = '';
-    if (value <= 0 || net === 0) cls = 'yellow';
-    if (net < 0) cls = 'red';
-    if (isCapped) cls = 'yellow';
+    if (value <= 0 && net < 0) cls = 'red blink';
+    else if (net < 0) cls = 'red';
+    else if (value <= 0 || isCapped) cls = 'yellow';
     items.push(`<span class="${cls}">${emojis[resource]} ${resource}: <b>${value}</b> <small>(${formatDelta(net)})</small></span>`);
   }
 
@@ -215,6 +224,13 @@ function renderIntel() {
 
 function costLine(cost) {
   return Object.entries(cost).map(([key, value]) => `${emojis[key] || ''}${key}:${value}`).join(', ');
+}
+
+function productionLine(building) {
+  const entries = [];
+  for (const [key, value] of Object.entries(building.production || {})) entries.push(`${key}: ${value}/year`);
+  for (const [key, value] of Object.entries(building.upkeep || {})) entries.push(`${key}: -${value}/year`);
+  return entries.length ? entries.join(', ') : 'No direct production';
 }
 
 function getMissingCost(cost, amount = 1) {
@@ -344,6 +360,7 @@ function renderDashboard() {
         <div class="small">${getConnectionLabel()}</div>
         <div class="small">Session recovery is enabled in this browser.</div>
         <div class="small">Chat remains available before the match starts.</div>
+        ${actionBtn('Surrender', () => sendAction('chat', { text: '/surrender' }), { disabled: state.game.phase === 'finished', title: state.game.phase === 'finished' ? 'Match already finished' : 'Surrender the current match' })}
       </div>
     </div>
     ${renderPendingActions()}
@@ -363,6 +380,7 @@ function renderEconomyOrBuildings() {
       <b>${emojis[id] || ''} ${building.name}</b>
       <div class="small">Owned: ${you.buildings[id]} | Build time: ${building.buildTime} months</div>
       <div class="small">Cost: ${costLine(building.cost)}</div>
+      <div class="small">Output: ${productionLine(building)}</div>
       ${renderReasons(cardState.reasons)}
       ${actionBtn(label, () => sendAction('build', { id }), { disabled: cardState.disabled, title: cardState.reasons.join(' | ') })}
     </div>`;
@@ -373,8 +391,6 @@ function renderMilitary() {
   const you = state.game.you;
   const unitIds = Object.keys(state.meta.units);
   const defenseIds = ['missile_silo', 'anti_missile_battery', 'wall'];
-  const scoutState = getQuickActionState('scout');
-  const missileState = getQuickActionState('missile');
 
   let html = '<h3>Military Units</h3><div class="action-grid">';
   html += unitIds.map((id) => {
@@ -405,38 +421,12 @@ function renderMilitary() {
       <b>${emojis[id] || ''} ${building.name}</b>
       <div class="small">Owned: ${you.buildings[id]} | Build time: ${building.buildTime} months</div>
       <div class="small">Cost: ${costLine(building.cost)}</div>
+      <div class="small">Output: ${productionLine(building)}</div>
       ${renderReasons(cardState.reasons)}
       ${actionBtn(label, () => sendAction('build', { id }), { disabled: cardState.disabled, title: cardState.reasons.join(' | ') })}
     </div>`;
   }).join('');
   html += '</div>';
-
-  html += `<h3>Quick War Orders</h3>
-    <div class="card">
-      ${renderReasons(scoutState.reasons)}
-      <div class="row">
-        ${actionBtn('Queue Scout', () => sendAction('scout', {}), { disabled: scoutState.disabled, title: scoutState.reasons.join(' | ') })}
-        <select id="missileTarget">
-          <option value="economy">Economy</option>
-          <option value="military">Military</option>
-          <option value="support">Population Centers</option>
-        </select>
-        ${actionBtn('Queue Missile', () => sendAction('missile', { target: document.getElementById('missileTarget').value }), { disabled: missileState.disabled, title: missileState.reasons.join(' | ') })}
-      </div>
-      ${renderReasons(missileState.reasons)}
-      <div class="row compact" title="Commit: Soldier, Tank, War Ship, Fighter Zed">
-        🪖<input id="ass_soldier" type="number" value="5" min="0" />
-        🛞<input id="ass_tank" type="number" value="0" min="0" />
-        🚢<input id="ass_war_ship" type="number" value="0" min="0" />
-        🛩️<input id="ass_fighter_zed" type="number" value="0" min="0" />
-        ${actionBtn('Queue Assault', () => sendAction('assault', {
-          soldier: Number(document.getElementById('ass_soldier').value),
-          tank: Number(document.getElementById('ass_tank').value),
-          war_ship: Number(document.getElementById('ass_war_ship').value),
-          fighter_zed: Number(document.getElementById('ass_fighter_zed').value)
-        }), { disabled: state.game.phase !== 'active', title: state.game.phase !== 'active' ? 'Match not active' : '' })}
-      </div>
-    </div>`;
 
   tabContent.innerHTML = html;
 }
@@ -452,7 +442,7 @@ function renderResearch() {
       const label = cardState.isCurrent ? `Researching... ${progress}%` : 'Start';
       return `<div class="card">
         <b>${tech.name}</b>
-        <div class="small">Cost: ${costLine(tech.cost)} | ${tech.years} months</div>
+        <div class="small">Cost: ${costLine(tech.cost)} | 🕒 ${tech.years} months</div>
         <div class="small">Progress: ${progress}%</div>
         <div class="progress"><span style="width:${progress}%"></span></div>
         ${renderReasons(cardState.reasons)}
@@ -517,6 +507,7 @@ function drawTabs() {
   tabsEl.querySelectorAll('button').forEach((button) => {
     button.addEventListener('click', () => {
       state.tab = button.dataset.tab;
+      setNotice(null);
       drawTabs();
       renderTab();
     });
@@ -539,12 +530,15 @@ function applyGameState(game) {
   state.game = game;
   state.lastStateAt = Date.now();
   if (game?.you?.name) nameEl.value = game.you.name;
-  saveSession();
-  if (!state.game?.opponent?.name) {
-    roomInfoEl.textContent = `Room ${state.roomId}. Share this 4-digit code with your opponent.`;
+  if (state.game?.phase === 'finished') {
+    clearSession();
+    setupEl.classList.remove('hidden');
   } else {
+    saveSession();
+  }
+  roomInfoEl.textContent = '';
+  if (state.game?.phase !== 'finished' && state.game?.opponent?.name) {
     setupEl.classList.add('hidden');
-    roomInfoEl.textContent = `Room ${state.roomId}`;
   }
   renderAll();
 }
@@ -615,7 +609,7 @@ document.getElementById('createBtn').addEventListener('click', async () => {
     state.playerId = data.playerId;
     state.reconnectToken = data.reconnectToken;
     joinFlowEl.classList.add('hidden');
-    roomInfoEl.textContent = `Game created. Your 4-digit code is ${state.roomId}.`;
+    roomInfoEl.textContent = '';
     saveSession();
     connectStream();
   } catch (error) {
@@ -641,7 +635,7 @@ document.getElementById('joinConfirmBtn').addEventListener('click', async () => 
     state.roomId = data.roomId;
     state.playerId = data.playerId;
     state.reconnectToken = data.reconnectToken;
-    roomInfoEl.textContent = `Joined room ${state.roomId}.`;
+    roomInfoEl.textContent = '';
     saveSession();
     connectStream();
   } catch (error) {

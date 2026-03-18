@@ -152,6 +152,15 @@ button:disabled {
   grid-template-rows: minmax(260px, 1fr) minmax(220px, auto);
 }
 
+.chat-panel {
+  height: 320px;
+  min-height: 320px;
+}
+
+.intel-panel {
+  min-height: 220px;
+}
+
 #events {
   list-style: none;
   padding: 0;
@@ -239,9 +248,7 @@ button:disabled {
 .hidden { display: none !important; }
 
 #roomInfo {
-  margin: 10px 0;
-  font-weight: 600;
-  color: var(--accent-amber);
+  display: none;
 }
 
 .status {
@@ -282,6 +289,8 @@ button:disabled {
 }
 
 #intel {
+  flex: 1;
+  overflow-y: auto;
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
@@ -338,6 +347,10 @@ button:disabled {
   }
   .right {
     grid-template-rows: auto auto;
+  }
+
+  .chat-panel {
+    height: 320px;
   }
 }
 

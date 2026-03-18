@@ -61,7 +61,9 @@ Every 60 seconds the server performs the following steps in exact order for both
 **Resource Rules**  
 Resources are displayed in the top bar with current total and net change for the next year.  
 - If net change for any resource is negative, the number turns red.  
-- If a resource total is 0 or the net change is exactly 0, the number turns solid yellow.  
+- If a resource total reaches 0, the number turns solid yellow.  
+- If a resource is both at 0 and still has a negative net change, the number blinks red.  
+- If the net change is exactly 0 but the resource total is above 0, the number stays normal.  
 - If total storage capacity of all related buildings is reached, the resource remains solid yellow. Excess production is lost.  
 
 **Population Rules**  
@@ -73,29 +75,31 @@ Resources are displayed in the top bar with current total and net change for the
 
 **User Interface Layout**  
 - **Top Bar** (always visible):  
-  Year number | Population (current/max) | Net nutrition change | All resources with emojis and net change (red when negative or at capacity). See `docs/ui/emoji-map.md` for the full emoji set.  
+  Year number | Population (current/max) | Net nutrition change | All resources with emojis and net change (red when negative, yellow when depleted or capped). See `docs/ui/emoji-map.md` for the full emoji set.  
 
 - **Left Panel**: Event Log  
   Displays the last 10 important events in chronological order (missile impacts, scout detections, battles, building completions, population deaths, etc.). New events push older ones down.  
 
 - **Upper Right Panel**: Chat  
-  Real-time chat between the two players. Messages appear instantly. No commands except “/surrender” which instantly ends the game in the opponent’s favor.  
+  Real-time chat between the two players. Messages appear instantly in a fixed-height scrollable panel. No commands except “/surrender” which instantly ends the game in the opponent’s favor.  
 
 - **Lower Right Panel**: Opponent Intel  
   Shows only scouted information (buildings and approximate resource levels). Updates only when new scouting data arrives.  
 
 - **Main Area**: Six tabs (click to switch)  
-  1. Dashboard (overview numbers and big “End Year Early” test button)  
+  1. Dashboard (overview numbers and surrender button)  
   2. Economy (resource buildings only)  
   3. Buildings (support buildings only)  
   4. Military (train units and build defenses)  
   5. Research (tech tree with progress bars)  
-  6. War Room (scout, launch missiles, commit ground assaults)
+  6. War Room (queued actions, scout, launch missiles, commit ground assaults)
 
 **Buildings**  
 All buildings currently take 1–3 months to complete in the shipped prototype. Only one of each type can be built per category unless specified. Workers can be assigned to speed production.  
 
 **Resource Buildings** (Economy tab)  
+Each card shows cost, build time, and the resource output or upkeep it contributes per year.
+
 - Farm: +4 nutrition per year base. Cost: 15 lumber, 10 steel. Build time: 2 months. Capacity: 200 nutrition.  
 - Lumber Camp: +3 lumber per year base. Cost: 10 lumber, 5 steel. Build time: 1 month. Capacity: 150 lumber.  
 - Steel Mill: +2 steel per year base. Cost: 20 lumber, 10 steel. Build time: 2 months. Capacity: 100 steel.  
@@ -171,6 +175,10 @@ Tier 4 (End-game)
 - Attacker steals 10–20% of one random resource type if victorious.  
 
 All attacks launch instantly but resolve at the end of the current year tick.
+
+**Match Reset Flow**
+- If a player surrenders from the Dashboard button or by typing `/surrender`, the match ends immediately.
+- After a match ends, the create/join controls reappear so a new room can be started without reloading the page.
 
 **Victory Conditions**  
 The game ends immediately when any of these occurs:  
