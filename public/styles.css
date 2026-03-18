@@ -382,19 +382,53 @@ button:disabled {
 ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
 
 @media (max-width: 1024px) {
-  .layout {
-    grid-template-columns: 1fr;
-    overflow-y: auto;
+  body {
+    overflow: auto;
   }
 
+  #app {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  .left,
+  .center,
+  .right {
+    height: auto;
+    min-height: auto;
+    overflow: visible;
+  }
+
+  .event-panel,
   .chat-panel {
     height: auto;
+    min-height: 220px;
+  }
+
+  .summary-panel,
+  #tabContent {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .action-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   }
 }
 
 @media (max-width: 720px) {
-  header {
-    position: static;
+  body {
+    overflow: auto;
+  }
+
+  #app {
+    height: auto;
+    min-height: 100vh;
   }
 
   .panel,
@@ -402,13 +436,96 @@ button:disabled {
     padding: 0.85rem;
   }
 
+  header {
+    padding: 0.85rem;
+  }
+
+  h1 {
+    font-size: 1rem;
+    letter-spacing: 1px;
+  }
+
+  .layout {
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .tabs {
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
+  }
+
   .tab {
-    flex: 1 1 140px;
+    flex: 1 1 calc(50% - 0.4rem);
     text-align: center;
+    padding: 8px 10px;
+    font-size: 0.82rem;
   }
 
   .pending-item {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  #setup,
+  .row,
+  .stepper,
+  .war-room-grid {
+    width: 100%;
+  }
+
+  #setup > *,
+  .row > *,
+  .stepper > * {
+    max-width: 100%;
+  }
+
+  input,
+  button,
+  select {
+    font-size: 0.85rem;
+    padding: 8px 10px;
+  }
+
+  #name,
+  #roomInput,
+  #chatInput {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .action-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .summary-grid,
+  .split-panels {
+    grid-template-columns: 1fr;
+  }
+
+  .data-table {
+    font-size: 0.78rem;
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 7px 8px;
+  }
+
+  .event-panel {
+    min-height: 260px;
+  }
+
+  .chat-panel {
+    min-height: 180px;
+  }
+
+  .summary-panel {
+    min-height: 240px;
   }
 }
