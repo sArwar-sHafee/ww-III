@@ -234,7 +234,7 @@ const UNITS = {
     requiresTech: 'guided_missiles',
     requiresBuilding: 'dry_dock',
     defenceAssignable: true,
-    combatProfile: [['war_ship', 1.5], ['submarine', 1], ['tank', 0.5]]
+    combatProfile: [['war_ship', 1.5], ['submarine', 1]]
   },
   air_defence_gun: {
     name: 'Air Defence Gun',
@@ -609,7 +609,9 @@ function getAvailableAttackUnitCount(player, id) {
 }
 
 function getPendingMissileReservations(player, missileId) {
-  return (player.pending || []).filter((action) => action.type === 'missile' && action.missileId === missileId).length;
+  return (player.pending || [])
+    .filter((action) => action.type === 'missile' && action.missileId === missileId)
+    .reduce((sum, action) => sum + Math.max(1, Math.floor(Number(action.amount || 1))), 0);
 }
 
 function getPendingScoutReservations(player) {
@@ -982,58 +984,61 @@ function resolveMissileAction(room, player, opponent, action) {
   const missile = UNITS[action.missileId];
   const bucket = isValidTargetBucket(action.targetBucket) ? action.targetBucket : 'economy';
   if (!missile?.missile || !hasResearch(player, 'missile_silo', room.year) || player.units[action.missileId] <= 0) return;
+  const total = Math.max(1, Math.floor(Number(action.amount || 1)));
+  for (let i = 0; i < total; i += 1) {
+    if (player.units[action.missileId] <= 0) break;
+    player.units[action.missileId] -= 1;
+    const interceptScore = getMissileInterceptScore(opponent, bucket, action.missileId);
+    const integrity = missile.missileIntegrity || 1;
+    const effectiveness = Math.max(0, 1 - Math.min(interceptScore, integrity) / integrity);
 
-  player.units[action.missileId] -= 1;
-  const interceptScore = getMissileInterceptScore(opponent, bucket, action.missileId);
-  const integrity = missile.missileIntegrity || 1;
-  const effectiveness = Math.max(0, 1 - Math.min(interceptScore, integrity) / integrity);
+    if (effectiveness <= 0) {
+      appendEvent(player, room.year, `🛡️ ${missile.name} intercepted over ${getBucketLabel(bucket)}`);
+      appendEvent(opponent, room.year, `🛡️ ${missile.name} intercepted over ${getBucketLabel(bucket)}`);
+      appendIntel(player, room.year, {
+        tone: 'warn',
+        bucket,
+        title: `${missile.name} intercepted`,
+        summary: `${getBucketLabel(bucket)} held the incoming missile.`,
+        details: formatDefenderAssignments(opponent, bucket)
+      });
+      appendIntel(opponent, room.year, {
+        tone: 'error',
+        bucket,
+        title: `${missile.name} intercepted`,
+        summary: `Assigned air defence stopped a strike on ${getBucketLabel(bucket)}.`,
+        details: formatDefenderAssignments(opponent, bucket)
+      });
+      setForcedIntelView(opponent, `${missile.name} intercepted over ${getBucketLabel(bucket)}`);
+      continue;
+    }
 
-  if (effectiveness <= 0) {
-    appendEvent(player, room.year, `🛡️ ${missile.name} intercepted over ${getBucketLabel(bucket)}`);
-    appendEvent(opponent, room.year, `🛡️ ${missile.name} intercepted over ${getBucketLabel(bucket)}`);
+    const strike = missile.strike?.[bucket] || {};
+    const attackModifier = getAttackImpactModifier(player, bucket, room.year);
+    const scaledImpact = scaleBucketImpact(strike, effectiveness * attackModifier);
+    const details = [
+      describeAttackImpactModifier(attackModifier),
+      ...applyBucketImpact(room, player, opponent, bucket, scaledImpact)
+    ];
+
+    appendEvent(player, room.year, `💥 ${missile.name} struck ${getBucketLabel(bucket)}`);
+    appendEvent(opponent, room.year, `💥 Incoming ${missile.name} hit ${getBucketLabel(bucket)}. See Opponent Intel.`, 'error');
     appendIntel(player, room.year, {
-      tone: 'warn',
+      tone: 'error',
       bucket,
-      title: `${missile.name} intercepted`,
-      summary: `${getBucketLabel(bucket)} held the incoming missile.`,
-      details: formatDefenderAssignments(opponent, bucket)
+      title: `${missile.name} strike confirmed`,
+      summary: `${getBucketLabel(bucket)} took deterministic missile damage.`,
+      details
     });
     appendIntel(opponent, room.year, {
       tone: 'error',
       bucket,
-      title: `${missile.name} intercepted`,
-      summary: `Assigned air defence stopped a strike on ${getBucketLabel(bucket)}.`,
-      details: formatDefenderAssignments(opponent, bucket)
+      title: `${missile.name} impact report`,
+      summary: `${getBucketLabel(bucket)} was struck.`,
+      details
     });
-    setForcedIntelView(opponent, `${missile.name} intercepted over ${getBucketLabel(bucket)}`);
-    return;
+    setForcedIntelView(opponent, `${missile.name} hit ${getBucketLabel(bucket)}`);
   }
-
-  const strike = missile.strike?.[bucket] || {};
-  const attackModifier = getAttackImpactModifier(player, bucket, room.year);
-  const scaledImpact = scaleBucketImpact(strike, effectiveness * attackModifier);
-  const details = [
-    describeAttackImpactModifier(attackModifier),
-    ...applyBucketImpact(room, player, opponent, bucket, scaledImpact)
-  ];
-
-  appendEvent(player, room.year, `💥 ${missile.name} struck ${getBucketLabel(bucket)}`);
-  appendEvent(opponent, room.year, `💥 Incoming ${missile.name} hit ${getBucketLabel(bucket)}. See Opponent Intel.`, 'error');
-  appendIntel(player, room.year, {
-    tone: 'error',
-    bucket,
-    title: `${missile.name} strike confirmed`,
-    summary: `${getBucketLabel(bucket)} took deterministic missile damage.`,
-    details
-  });
-  appendIntel(opponent, room.year, {
-    tone: 'error',
-    bucket,
-    title: `${missile.name} impact report`,
-    summary: `${getBucketLabel(bucket)} was struck.`,
-    details
-  });
-  setForcedIntelView(opponent, `${missile.name} hit ${getBucketLabel(bucket)}`);
 }
 
 function buildDefenderRoster(player, bucket) {
@@ -1587,13 +1592,14 @@ const server = http.createServer(async (req, res) => {
       } else if (type === 'missile') {
         const missileId = actionPayload.missileId;
         const bucket = actionPayload.targetBucket;
+        const amount = Math.max(1, Math.floor(Number(actionPayload.amount || 1)));
         if (!isValidTargetBucket(bucket)) return writeJson(res, 400, { error: 'Invalid target bucket' });
         if (!UNITS[missileId]?.missile) return writeJson(res, 400, { error: 'Invalid missile' });
         if (!hasResearch(p, 'missile_silo', room.year)) return writeJson(res, 400, { error: 'Missile Silo offline' });
-        if ((p.units[missileId] || 0) - getPendingMissileReservations(p, missileId) <= 0) {
+        if ((p.units[missileId] || 0) - getPendingMissileReservations(p, missileId) < amount) {
           return writeJson(res, 400, { error: 'Not enough missile stock' });
         }
-        queueAction(room, p, { type: 'missile', missileId, targetBucket: bucket });
+        queueAction(room, p, { type: 'missile', missileId, targetBucket: bucket, amount });
       } else if (type === 'nuclear_strike') {
         if (room.winner) return writeJson(res, 400, { error: 'Match already finished' });
         if (getRoomPhase(room) !== 'active') return writeJson(res, 400, { error: 'Match not active' });

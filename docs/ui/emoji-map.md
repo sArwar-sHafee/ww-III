@@ -52,6 +52,6 @@
 - Cruise Missile: ☄️
 - Scout Drone: 🛰️
 - Anti-Tank Squad: 🧨
-- Naval Strike Missile: 🚀
+- Naval Strike Missile: 🧿
 - Air Defence Gun: 🎯
 - Border Guard: 🛂

@@ -20,6 +20,7 @@ const state = {
   selectedScoutTarget: 'economy',
   selectedMissile: 'ballistic_missile',
   selectedMissileTarget: 'economy',
+  missileDraft: 1,
   selectedAssaultTarget: 'economy',
   warRoomDraft: {},
   lockUiActive: false
@@ -39,7 +40,7 @@ const emojis = {
   farm: '🌾', lumber_camp: '🪓', steel_mill: '🏭', copper_mine: '🥉', alloy_quarry: '⛏️', oil_rig: '🛢️', magnet_extractor: '🧲', power_plant: '⚡', glassworks: '🪟', polymer_plant: '🧪', concrete_plant: '🧱', silicon_refinery: '🖥️', uranium_mine: '☢️',
   shelter: '🏠', barracks: '🏕️', factory: '🏭', radar_station: '📡', dry_dock: '⚓', airfield: '🛫',
   anti_missile_battery: '🛡️', land_mine: '💣',
-  infantry: '🪖', special_force: '🎖️', tank: '🛞', war_ship: '🚢', submarine: '🚤', fighter_zed: '🛩️', attack_helicopter: '🚁', combat_drone: '🤖', ballistic_missile: '🚀', cruise_missile: '☄️', scout_drone: '🛰️', anti_tank_squad: '🧨', naval_strike_missile: '🚀', air_defence_gun: '🎯', border_guard: '🛂'
+  infantry: '🪖', special_force: '🎖️', tank: '🛞', war_ship: '🚢', submarine: '🚤', fighter_zed: '🛩️', attack_helicopter: '🚁', combat_drone: '🤖', ballistic_missile: '🚀', cruise_missile: '☄️', scout_drone: '🛰️', anti_tank_squad: '🧨', naval_strike_missile: '🧿', air_defence_gun: '🎯', border_guard: '🛂'
 };
 const tabs = ['dashboard', 'economy', 'trade', 'supports', 'military', 'defences', 'research', 'war_room', 'defence_room', 'opponent_intel'];
 const tabLabels = {
@@ -671,8 +672,18 @@ function getUnitDraft(id) {
   return Math.max(1, Number(state.unitDrafts[id] || 1));
 }
 
+function getMissileDraft() {
+  return Math.max(1, Number(state.missileDraft || 1));
+}
+
 function adjustUnitDraft(id, delta) {
   state.unitDrafts[id] = Math.max(1, getUnitDraft(id) + delta);
+  state.forceTabRefresh = true;
+  renderAll();
+}
+
+function adjustMissileDraft(delta) {
+  state.missileDraft = Math.max(1, getMissileDraft() + delta);
   state.forceTabRefresh = true;
   renderAll();
 }
@@ -790,7 +801,7 @@ function getResearchCardState(id) {
   return { disabled: reasons.length > 0, reasons, isCurrent };
 }
 
-function getQuickActionState(type, missileId = state.selectedMissile) {
+function getQuickActionState(type, missileId = state.selectedMissile, amount = getMissileDraft()) {
   const you = state.game.you;
   const reasons = [];
   if (state.game.phase !== 'active') reasons.push('Match not active');
@@ -802,7 +813,7 @@ function getQuickActionState(type, missileId = state.selectedMissile) {
     const missile = state.meta.units[missileId];
     if (!hasTechOnline('missile_silo')) reasons.push('Missile Silo offline');
     if (!missile?.missile) reasons.push('Choose a missile type');
-    if ((you.units[missileId] || 0) <= 0) reasons.push(`Need ${missile?.name || 'missile stock'}`);
+    if ((you.units[missileId] || 0) < amount) reasons.push(`Need ${amount} ${missile?.name || 'missile stock'}`);
   }
   if (type === 'nuclear') {
     if (!hasTechOnline('nuclear_technology')) reasons.push('Nuclear Technology offline');
@@ -823,7 +834,10 @@ function renderReasons(reasons) {
 }
 
 function formatPendingAction(action) {
-  if (action.type === 'missile') return `${state.meta.units[action.missileId]?.name || 'Missile'} strike -> ${getTargetLabel(action.targetBucket)}`;
+  if (action.type === 'missile') {
+    const amount = Math.max(1, Math.floor(Number(action.amount || 1)));
+    return `${state.meta.units[action.missileId]?.name || 'Missile'} x${amount} strike -> ${getTargetLabel(action.targetBucket)}`;
+  }
   if (action.type === 'scout') return `Scout -> ${getTargetLabel(action.targetBucket)}`;
   if (action.type === 'assault') {
     const forces = getAssaultUnits().map(([id]) => id)
@@ -1221,7 +1235,7 @@ function renderResearch() {
 
 function renderWarRoom() {
   const scoutState = getQuickActionState('scout');
-  const missileState = getQuickActionState('missile', state.selectedMissile);
+  const missileState = getQuickActionState('missile', state.selectedMissile, getMissileDraft());
   const nuclearState = getQuickActionState('nuclear');
   const assaultRows = getAssaultUnits().map(([id, unit]) => {
     updateWarRoomDraft(id, state.warRoomDraft[id] || 0);
@@ -1251,8 +1265,14 @@ function renderWarRoom() {
         ${actionBtn('Launch Missile', () => {
           state.selectedMissile = document.getElementById('wrMissile').value;
           state.selectedMissileTarget = document.getElementById('wrMissileTarget').value;
-          sendAction('missile', { missileId: state.selectedMissile, targetBucket: state.selectedMissileTarget });
+          sendAction('missile', { missileId: state.selectedMissile, targetBucket: state.selectedMissileTarget, amount: getMissileDraft() });
         }, { disabled: missileState.disabled, title: missileState.reasons.join(' | ') })}
+      </div>
+      <div class="row stepper">
+        ${actionBtn('-', () => adjustMissileDraft(-1), { disabled: getMissileDraft() <= 1 })}
+        <input id="wrMissileAmt" type="number" value="${getMissileDraft()}" min="1" readonly />
+        ${actionBtn('+', () => adjustMissileDraft(1))}
+        <span class="small">Missiles per launch</span>
       </div>
       ${renderReasons(nuclearState.reasons)}
       <div class="row">
