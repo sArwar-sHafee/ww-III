@@ -334,6 +334,10 @@ function createEmptyDefenceAssignments() {
   ]));
 }
 
+function createScoutIntelAssignments() {
+  return Object.fromEntries(TARGET_BUCKET_KEYS.map((bucket) => [bucket, -1]));
+}
+
 function createPlayer(playerId, name) {
   return {
     playerId,
@@ -353,6 +357,7 @@ function createPlayer(playerId, name) {
     tradeOrders: [],
     autoTrades: Object.fromEntries(RESOURCE_KEYS.map((resource) => [resource, null])),
     scoutCooldownUntil: -1,
+    scoutIntelUntil: createScoutIntelAssignments(),
     opponentIntelLog: [],
     defenceAssignments: createEmptyDefenceAssignments(),
     forcedView: null,
@@ -368,6 +373,40 @@ function getBucketLabel(bucket) {
 
 function isValidTargetBucket(bucket) {
   return TARGET_BUCKET_KEYS.includes(bucket);
+}
+
+function hasActiveScoutIntel(player, bucket, year) {
+  if (!isValidTargetBucket(bucket)) return false;
+  return year < (player.scoutIntelUntil?.[bucket] ?? -1);
+}
+
+function getAttackImpactModifier(player, bucket, year) {
+  return hasActiveScoutIntel(player, bucket, year) ? 1 : 0.8;
+}
+
+function describeAttackImpactModifier(modifier) {
+  return modifier >= 1
+    ? 'Attack efficiency: 100% (active scout intel)'
+    : 'Attack efficiency: 80% (no active scout intel)';
+}
+
+function scaleImpactValue(value, modifier) {
+  const numeric = Math.max(0, Number(value || 0));
+  if (numeric <= 0 || modifier <= 0) return 0;
+  if (modifier >= 1) return Math.ceil(numeric * modifier);
+  return Math.max(1, Math.floor(numeric * modifier));
+}
+
+function scaleBucketImpact(impact = {}, modifier = 1) {
+  return {
+    buildingLosses: scaleImpactValue(impact.buildingLosses, modifier),
+    resourcePct: (impact.resourcePct || 0) * modifier,
+    lootPct: (impact.lootPct || 0) * modifier,
+    populationLoss: scaleImpactValue(impact.populationLoss, modifier),
+    delayMonths: scaleImpactValue(impact.delayMonths, modifier),
+    disableCount: scaleImpactValue(impact.disableCount, modifier),
+    disableYears: scaleImpactValue(impact.disableYears, modifier)
+  };
 }
 
 function getBucketBuildingIds(bucket) {
@@ -885,6 +924,7 @@ function resolveScoutAction(room, player, opponent, action) {
   const bucket = isValidTargetBucket(action.targetBucket) ? action.targetBucket : 'economy';
   if (player.units.scout_drone <= 0 || room.year < player.scoutCooldownUntil) return;
   player.scoutCooldownUntil = room.year + 1;
+  player.scoutIntelUntil[bucket] = Math.max(player.scoutIntelUntil[bucket] || -1, room.year + 2);
   const details = buildScoutReport(room, opponent, bucket);
   appendIntel(player, room.year, {
     tone: 'error',
@@ -929,15 +969,12 @@ function resolveMissileAction(room, player, opponent, action) {
   }
 
   const strike = missile.strike?.[bucket] || {};
-  const scaledImpact = {
-    buildingLosses: Math.ceil((strike.buildingLosses || 0) * effectiveness),
-    resourcePct: (strike.resourcePct || 0) * effectiveness,
-    populationLoss: Math.ceil((strike.populationLoss || 0) * effectiveness),
-    delayMonths: Math.ceil((strike.delayMonths || 0) * effectiveness),
-    disableCount: Math.ceil((strike.disableCount || 0) * effectiveness),
-    disableYears: Math.ceil((strike.disableYears || 0) * effectiveness)
-  };
-  const details = applyBucketImpact(room, player, opponent, bucket, scaledImpact);
+  const attackModifier = getAttackImpactModifier(player, bucket, room.year);
+  const scaledImpact = scaleBucketImpact(strike, effectiveness * attackModifier);
+  const details = [
+    describeAttackImpactModifier(attackModifier),
+    ...applyBucketImpact(room, player, opponent, bucket, scaledImpact)
+  ];
 
   appendEvent(player, room.year, `💥 ${missile.name} struck ${getBucketLabel(bucket)}`);
   appendEvent(opponent, room.year, `💥 Incoming ${missile.name} hit ${getBucketLabel(bucket)}. See Opponent Intel.`, 'error');
@@ -999,12 +1036,17 @@ function resolveAssaultAction(room, player, opponent, action) {
 
   if (battle.attackerWon) {
     const survivorScore = Math.max(1, Math.ceil(getCombatScore(battle.attackersRemaining) / 120));
-    const impact = bucket === 'economy'
+    const attackModifier = getAttackImpactModifier(player, bucket, room.year);
+    const baseImpact = bucket === 'economy'
       ? { buildingLosses: Math.min(4, survivorScore), lootPct: Math.min(0.18, 0.06 + survivorScore * 0.02) }
       : bucket === 'buildings'
         ? { buildingLosses: Math.min(4, Math.max(1, survivorScore)), populationLoss: Math.min(8, survivorScore * 2) }
         : { delayMonths: Math.max(3, survivorScore * 3), disableCount: Math.min(2, survivorScore), disableYears: survivorScore >= 2 ? 2 : 1 };
-    const impactDetails = applyBucketImpact(room, player, opponent, bucket, impact);
+    const impact = scaleBucketImpact(baseImpact, attackModifier);
+    const impactDetails = [
+      describeAttackImpactModifier(attackModifier),
+      ...applyBucketImpact(room, player, opponent, bucket, impact)
+    ];
     appendEvent(player, room.year, `⚔️ Assault breached ${getBucketLabel(bucket)}`);
     appendEvent(opponent, room.year, `⚔️ ${getBucketLabel(bucket)} was breached. See Opponent Intel.`, 'error');
     appendIntel(player, room.year, {
@@ -1146,8 +1188,9 @@ function resolveTick(room) {
     // 6 population growth or starvation at year end
     if (isYearEnd) {
       if (p.resources.nutrition <= 0 && p.population > 0) {
-        p.population -= 1;
-        appendEvent(p, room.year, '☠️ Population starvation: -1');
+        const starvationLoss = Math.min(p.population, Math.max(1, Math.ceil(p.population * 0.1)));
+        p.population -= starvationLoss;
+        appendEvent(p, room.year, `☠️ Population starvation: -${starvationLoss}`);
       }
       const surplus = p.resources.nutrition - p.population * 10;
       if (surplus > 10 && p.population < p.populationMax) {

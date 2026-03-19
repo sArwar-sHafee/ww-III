@@ -14,6 +14,6 @@ Handle nutrition consumption, starvation, and population growth.
 
 ## Rules
 - Consumption: 0.8 nutrition per person per year.
-- If nutrition hits 0, 1 person dies per year until nutrition is available.
+- If nutrition hits 0, 10% of the current population dies per year until nutrition is available.
 - Surplus nutrition (more than 10 extra per person) gives +0.2 population growth per year, rounded down.
 - Population is capped by Shelter capacity.

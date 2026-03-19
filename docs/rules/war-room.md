@@ -2,6 +2,7 @@
 
 ## Scouting
 - Scout Drone reveals exact enemy buildings and approximate resources for 2 years.
+- Missile and assault attacks on the same bucket deal 100% impact while scout intel is active, otherwise 80%.
 - Target receives a scout-detected event.
 
 ## Missile Strikes

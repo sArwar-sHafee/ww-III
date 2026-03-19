@@ -105,6 +105,7 @@ The current implementation is a server-authoritative Node.js prototype with SSE 
 
 ## War Room
 - Scout Drone can reveal opponent buildings and approximate resources for 2 years.
+- Missile and assault attacks on a bucket use 100% impact with active scout intel on that bucket, otherwise 80%.
 - Missiles are launched from owned missile stock after `Missile Silo` research is completed.
 - Assaults can commit all assault-capable military units.
 - Assault strength uses each unit's configured attack value.

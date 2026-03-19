@@ -1192,6 +1192,7 @@ function renderWarRoom() {
   const assaultPayload = Object.fromEntries(getAssaultUnits().map(([id]) => [id, state.warRoomDraft[id] || 0]).filter(([, count]) => count > 0));
   tabContent.innerHTML = `<h3>War Room</h3>
     <p>Queue actions now. All attacks resolve when the current year ends.</p>
+    <div class="small">Scout the same target bucket first for 100% attack impact. Attacks without active scout intel land at 80% impact.</div>
     ${renderPendingActions()}
     <div class="card">
       ${renderReasons(scoutState.reasons)}
