@@ -5,6 +5,7 @@
 - Nutrition: 🍲
 - Lumber: 🪵
 - Steel: 🔩
+- Copper: 🥉
 - Alloy: 🪙
 - Oil: 🛢️
 - Magnet: 🧲
@@ -13,11 +14,13 @@
 - Polymer: ♻️
 - Concrete: 🧱
 - Silicon: 💾
+- Uranium: ☢️
 
 ## Structures
 - Farm: 🌾
 - Lumber Camp: 🪓
 - Steel Mill: 🏭
+- Copper Mine: 🥉
 - Alloy Quarry: ⛏️
 - Oil Rig: 🛢️
 - Magnet Extractor: 🧲
@@ -25,9 +28,10 @@
 - Glassworks: 🪟
 - Polymer Plant: 🧪
 - Concrete Plant: 🧱
-- Silicon Refinery: 💾
+- Silicon Refinery: 🖥️
+- Uranium Mine: ☢️
 - Shelter: 🏠
-- Barracks: 🪖
+- Barracks: 🏕️
 - Factory: 🏭
 - Radar Station: 📡
 - Dry Dock: ⚓
@@ -45,7 +49,7 @@
 - Attack Helicopter: 🚁
 - Combat Drone: 🤖
 - Ballistic Missile: 🚀
-- Cruise Missile: 🛰️
+- Cruise Missile: ☄️
 - Scout Drone: 📡
 - Anti-Tank Squad: 🧨
 - Naval Strike Missile: 🚀

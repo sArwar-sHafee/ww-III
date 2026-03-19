@@ -28,17 +28,18 @@ const state = {
 const DEFAULT_API_ORIGIN = 'https://ww-iii.onrender.com';
 const API_ORIGIN = window.WWIII_API_ORIGIN || (window.location.hostname.endsWith('.vercel.app') ? DEFAULT_API_ORIGIN : '');
 const DEFAULT_RESOURCE_CAPACITY = 999999;
+const POPULATION_NUTRITION_PER_YEAR = 0.25;
 const emojis = {
   credits: '💳',
   people: '👥',
   economy: '💹',
   buildings: '🏗️',
-  research_center: '🧠',
-  nutrition: '🍲', lumber: '🪵', steel: '🔩', alloy: '🪙', oil: '🛢️', magnet: '🧲', electricity: '⚡', glass: '🪟', polymer: '♻️', concrete: '🧱', silicon: '💾',
-  farm: '🌾', lumber_camp: '🪓', steel_mill: '🏭', alloy_quarry: '⛏️', oil_rig: '🛢️', magnet_extractor: '🧲', power_plant: '⚡', glassworks: '🪟', polymer_plant: '🧪', concrete_plant: '🧱', silicon_refinery: '💾',
-  shelter: '🏠', barracks: '🪖', factory: '🏭', radar_station: '📡', dry_dock: '⚓', airfield: '🛫',
+  research_center: '🔬',
+  nutrition: '🍲', lumber: '🪵', steel: '🔩', copper: '🥉', alloy: '🪙', oil: '🛢️', magnet: '🧲', electricity: '⚡', glass: '🪟', polymer: '♻️', concrete: '🧱', silicon: '💾', uranium: '☢️',
+  farm: '🌾', lumber_camp: '🪓', steel_mill: '🏭', copper_mine: '🥉', alloy_quarry: '⛏️', oil_rig: '🛢️', magnet_extractor: '🧲', power_plant: '⚡', glassworks: '🪟', polymer_plant: '🧪', concrete_plant: '🧱', silicon_refinery: '🖥️', uranium_mine: '☢️',
+  shelter: '🏠', barracks: '🏕️', factory: '🏭', radar_station: '📡', dry_dock: '⚓', airfield: '🛫',
   anti_missile_battery: '🛡️', land_mine: '💣',
-  infantry: '🪖', special_force: '🎖️', tank: '🛞', war_ship: '🚢', submarine: '🚤', fighter_zed: '🛩️', attack_helicopter: '🚁', combat_drone: '🤖', ballistic_missile: '🚀', cruise_missile: '🛰️', scout_drone: '📡', anti_tank_squad: '🧨', naval_strike_missile: '🚀', air_defence_gun: '🎯'
+  infantry: '🪖', special_force: '🎖️', tank: '🛞', war_ship: '🚢', submarine: '🚤', fighter_zed: '🛩️', attack_helicopter: '🚁', combat_drone: '🤖', ballistic_missile: '🚀', cruise_missile: '☄️', scout_drone: '📡', anti_tank_squad: '🧨', naval_strike_missile: '🚀', air_defence_gun: '🎯'
 };
 const tabs = ['dashboard', 'economy', 'trade', 'supports', 'military', 'defences', 'research', 'war_room', 'defence_room', 'opponent_intel'];
 const tabLabels = {
@@ -443,7 +444,7 @@ function getResourceConsumptionTooltip(resource) {
   const you = state.game?.you;
   if (!you) return 'No yearly consumption';
   const rows = [];
-  if (resource === 'nutrition' && you.population > 0) rows.push(`${emojis.people} - ${formatAmount(you.population * 0.8)}`);
+  if (resource === 'nutrition' && you.population > 0) rows.push(`${emojis.people} - ${formatAmount(you.population * POPULATION_NUTRITION_PER_YEAR)}`);
   for (const [id, building] of Object.entries(state.meta?.buildings || {})) {
     const count = you.buildings?.[id] || 0;
     const value = building.upkeep?.[resource];
@@ -728,7 +729,7 @@ function getBuildCardState(id) {
   const inQueue = you.buildingQueues.find((queue) => queue.id === id);
   const reasons = [];
   if (state.game.phase !== 'active') reasons.push('Match not active');
-  if (inQueue) reasons.push('Already building');
+  if (inQueue) reasons.push('Building in Progress');
   if (building.requires && !building.requires.every((tech) => hasTechOnline(tech))) reasons.push(`Needs ${building.requires.map(techLabel).join(', ')}`);
   const missing = getMissingCost(building.cost);
   if (missing.length) reasons.push(`Missing ${missing.join(', ')}`);

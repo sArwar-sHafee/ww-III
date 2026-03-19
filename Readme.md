@@ -11,7 +11,7 @@ The current implementation is a server-authoritative Node.js prototype with SSE 
 - Both players start with the same boosted test baseline in the current build.
 
 ## Economy And Treasury
-- Resources: nutrition, lumber, steel, alloy, oil, magnet, electricity, glass, polymer, concrete, silicon.
+- Resources: nutrition, lumber, steel, copper, alloy, oil, magnet, electricity, glass, polymer, concrete, silicon, uranium.
 - Credits are the treasury currency.
 - At the end of each year, the player gains credits equal to current population.
   - Example: population `20` gives `+20` credits next year.
@@ -45,6 +45,7 @@ The current implementation is a server-authoritative Node.js prototype with SSE 
 - Farm
 - Lumber Camp
 - Steel Mill
+- Copper Mine
 - Alloy Quarry
 - Oil Rig
 - Magnet Extractor
@@ -53,6 +54,7 @@ The current implementation is a server-authoritative Node.js prototype with SSE 
 - Polymer Plant
 - Concrete Plant
 - Silicon Refinery
+- Uranium Mine
 
 ### Supports
 - Shelter: +5 population capacity

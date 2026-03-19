@@ -4,7 +4,7 @@
 Track resource amounts, apply production and consumption, enforce storage capacity and zero-flooring.
 
 ## Resources
-`nutrition`, `lumber`, `steel`, `alloy`, `oil`, `magnet`, `electricity`, `glass`, `polymer`, `concrete`, `silicon`
+`nutrition`, `lumber`, `steel`, `copper`, `alloy`, `oil`, `magnet`, `electricity`, `glass`, `polymer`, `concrete`, `silicon`, `uranium`
 
 ## Inputs
 - Building production outputs

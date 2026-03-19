@@ -26,11 +26,11 @@
 - `chat`: recent chat messages
 
 ## Resource Keys
-`nutrition`, `lumber`, `steel`, `alloy`, `oil`, `magnet`, `electricity`, `glass`, `polymer`, `concrete`, `silicon`
+`nutrition`, `lumber`, `steel`, `copper`, `alloy`, `oil`, `magnet`, `electricity`, `glass`, `polymer`, `concrete`, `silicon`, `uranium`
 
 ## Building IDs
-- `farm`, `lumber_camp`, `steel_mill`, `alloy_quarry`, `oil_rig`, `magnet_extractor`, `power_plant`
-- `glassworks`, `polymer_plant`, `concrete_plant`, `silicon_refinery`
+- `farm`, `lumber_camp`, `steel_mill`, `copper_mine`, `alloy_quarry`, `oil_rig`, `magnet_extractor`, `power_plant`
+- `glassworks`, `polymer_plant`, `concrete_plant`, `silicon_refinery`, `uranium_mine`
 - `shelter`, `barracks`, `factory`, `radar_station`, `dry_dock`, `airfield`
 - `anti_missile_battery`, `land_mine`
 
