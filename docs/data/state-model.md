@@ -19,6 +19,8 @@
 - `research.completed`: list of tech ids
 - `research.active`: `{id, ticksRemaining}` or `null`
 - `pending`: queued war-room actions for the current year
+- `tradeOrders`: list of delayed trade orders `{id, resource, mode, amount, ticksRemaining}`
+- `autoTrades`: map of `resource -> {mode, amount} | null`
 - `eventLog`: last 10 events
 - `chat`: recent chat messages
 

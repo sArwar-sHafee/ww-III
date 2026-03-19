@@ -15,6 +15,9 @@ const TICKS_PER_MONTH = 5;
 const TRADE_FEE = 1;
 const STARTING_RESOURCES = { nutrition: 5000, lumber: 3000, steel: 3000, alloy: 2000, oil: 2000, magnet: 1500, electricity: 2000, glass: 1500, polymer: 1500, concrete: 1500, silicon: 1500 };
 const RESOURCE_KEYS = Object.keys(STARTING_RESOURCES);
+const TRADE_DELAY_MONTHS = 3;
+const TRADE_DELAY_TICKS = TRADE_DELAY_MONTHS * TICKS_PER_MONTH;
+const TRADE_PRICES = Object.fromEntries(RESOURCE_KEYS.map((resource) => [resource, 1]));
 const STARTING_POPULATION = 100;
 const STARTING_POPULATION_MAX = 100;
 const STARTING_CREDITS = 500;
@@ -133,6 +136,8 @@ function createPlayer(playerId, name) {
     eventLog: [],
     chat: [],
     pending: [],
+    tradeOrders: [],
+    autoTrades: Object.fromEntries(RESOURCE_KEYS.map((resource) => [resource, null])),
     scoutCooldownUntil: -1,
     scoutIntel: null,
     zeroYears: 0,
@@ -182,6 +187,84 @@ function getPlayerCapacity(player) {
   return capacity;
 }
 
+function getTradeUnitPrice(resource) {
+  return TRADE_PRICES[resource] || 1;
+}
+
+function getTradeBuyCost(resource, amount) {
+  return amount * getTradeUnitPrice(resource) + TRADE_FEE;
+}
+
+function getTradeSellRevenue(resource, amount) {
+  return Math.max(0, amount * getTradeUnitPrice(resource) - TRADE_FEE);
+}
+
+function getReservedIncomingTradeAmount(player, resource) {
+  return player.tradeOrders
+    .filter((order) => order.mode === 'buy' && order.resource === resource)
+    .reduce((sum, order) => sum + order.amount, 0);
+}
+
+function settleTradeOrder(room, player, order) {
+  if (order.mode === 'buy') {
+    const capacity = getPlayerCapacity(player)[order.resource];
+    const freeSpace = Math.max(0, capacity - player.resources[order.resource]);
+    const delivered = Math.min(order.amount, freeSpace);
+    const refunded = order.amount - delivered;
+
+    if (delivered > 0) {
+      player.resources[order.resource] += delivered;
+      appendEvent(player, room.year, `📦 Trade arrived: bought ${delivered} ${order.resource}`);
+    }
+
+    if (refunded > 0) {
+      const refundCredits = refunded * getTradeUnitPrice(order.resource);
+      player.credits += refundCredits;
+      appendEvent(player, room.year, `⚠️ Trade overflow: refunded ${refundCredits} credits for ${refunded} ${order.resource}`, 'warn');
+    }
+    return;
+  }
+
+  const revenue = getTradeSellRevenue(order.resource, order.amount);
+  player.credits += revenue;
+  appendEvent(player, room.year, `💳 Trade settled: sold ${order.amount} ${order.resource} for ${revenue} credits`);
+}
+
+function resolveAutoTrades(room, player) {
+  for (const resource of RESOURCE_KEYS) {
+    const config = player.autoTrades[resource];
+    if (!config) continue;
+
+    if (config.mode === 'buy') {
+      const cost = getTradeBuyCost(resource, config.amount);
+      const capacity = getPlayerCapacity(player)[resource];
+      const reservedIncoming = getReservedIncomingTradeAmount(player, resource);
+      if (player.credits < cost) {
+        appendEvent(player, room.year, `🔁 Auto trade skipped: not enough credits to buy ${config.amount} ${resource}`, 'warn');
+        continue;
+      }
+      if (player.resources[resource] + reservedIncoming + config.amount > capacity) {
+        appendEvent(player, room.year, `🔁 Auto trade skipped: storage full for ${resource}`, 'warn');
+        continue;
+      }
+      player.credits -= cost;
+      player.resources[resource] += config.amount;
+      appendEvent(player, room.year, `🔁 Auto bought ${config.amount} ${resource} for ${cost} credits`);
+      continue;
+    }
+
+    if ((player.resources[resource] ?? 0) < config.amount) {
+      appendEvent(player, room.year, `🔁 Auto trade skipped: not enough ${resource} to sell ${config.amount}`, 'warn');
+      continue;
+    }
+
+    const revenue = getTradeSellRevenue(resource, config.amount);
+    player.resources[resource] -= config.amount;
+    player.credits += revenue;
+    appendEvent(player, room.year, `🔁 Auto sold ${config.amount} ${resource} for ${revenue} credits`);
+  }
+}
+
 function getMissileDamage(unitId) {
   if (unitId === 'ballistic_missile') return 0.25 + Math.random() * 0.15;
   if (unitId === 'cruise_missile') return 0.18 + Math.random() * 0.12;
@@ -221,6 +304,7 @@ function resolveTick(room) {
   for (const playerId of room.playerOrder) {
     const p = room.players[playerId];
     const deltas = Object.fromEntries(RESOURCE_KEYS.map((k) => [k, 0]));
+    const settledTradeOrders = [];
 
     // Resolve build/research queues every tick
     p.buildingQueues.forEach((q) => q.ticksRemaining--);
@@ -239,6 +323,12 @@ function resolveTick(room) {
         p.research.active = null;
       }
     }
+
+    p.tradeOrders.forEach((order) => order.ticksRemaining--);
+    for (const order of p.tradeOrders) {
+      if (order.ticksRemaining <= 0) settledTradeOrders.push(order);
+    }
+    p.tradeOrders = p.tradeOrders.filter((order) => order.ticksRemaining > 0);
 
     // Resources tick (1/60th of yearly value)
     const tickScale = 1 / TICKS_PER_YEAR;
@@ -335,6 +425,8 @@ function resolveTick(room) {
       p.resources[key] = Math.max(0, Math.min(next, capacity[key]));
     }
 
+    for (const order of settledTradeOrders) settleTradeOrder(room, p, order);
+
     // 6 population growth or starvation at year end
     if (isYearEnd) {
       if (p.resources.nutrition <= 0 && p.population > 0) {
@@ -351,10 +443,11 @@ function resolveTick(room) {
       }
       p.credits += p.population;
       appendEvent(p, room.year, `💳 Treasury income: +${p.population} credits`);
+      resolveAutoTrades(room, p);
     }
 
-    const anyRes = RESOURCE_KEYS.some((k) => p.resources[k] > 0);
     if (isYearEnd) {
+      const anyRes = RESOURCE_KEYS.some((k) => p.resources[k] > 0);
       p.zeroYears = anyRes ? 0 : p.zeroYears + 1;
       p.pending = [];
     }
@@ -405,6 +498,8 @@ function stripStateFor(room, playerId) {
       eventLog: p.eventLog,
       chat: p.chat,
       pending: p.pending,
+      tradeOrders: p.tradeOrders,
+      autoTrades: p.autoTrades,
       scoutCooldownUntil: p.scoutCooldownUntil,
       scoutIntel: p.scoutIntel,
       zeroYears: p.zeroYears,
@@ -611,24 +706,39 @@ const server = http.createServer(async (req, res) => {
         appendEvent(p, room.year, `🧠 Started research: ${tech.name}`);
       } else if (type === 'trade') {
         const resource = payload.resource;
-        const amount = Math.max(1, Number(payload.amount || 1));
+        const amount = Math.floor(Number(payload.amount || 0));
         const mode = payload.mode === 'sell' ? 'sell' : 'buy';
         if (!RESOURCE_KEYS.includes(resource)) return writeJson(res, 400, { error: 'Invalid resource' });
+        if (!Number.isInteger(amount) || amount < 1) return writeJson(res, 400, { error: 'Invalid amount' });
         if (mode === 'buy') {
-          const cost = amount + TRADE_FEE;
+          const cost = getTradeBuyCost(resource, amount);
           const capacity = getPlayerCapacity(p)[resource];
+          const reservedIncoming = getReservedIncomingTradeAmount(p, resource);
           if (p.credits < cost) return writeJson(res, 400, { error: 'Not enough credits' });
-          if (p.resources[resource] + amount > capacity) return writeJson(res, 400, { error: 'Storage full' });
+          if (p.resources[resource] + reservedIncoming + amount > capacity) return writeJson(res, 400, { error: 'Storage full' });
           p.credits -= cost;
-          p.resources[resource] += amount;
-          appendEvent(p, room.year, `💳 Bought ${amount} ${resource} for ${cost} credits`);
+          p.tradeOrders.push({ id: randomUUID(), mode, resource, amount, ticksRemaining: TRADE_DELAY_TICKS });
+          appendEvent(p, room.year, `📦 Buy order placed: ${amount} ${resource} arriving in ${TRADE_DELAY_MONTHS} months for ${cost} credits`);
         } else {
           if ((p.resources[resource] ?? 0) < amount) return writeJson(res, 400, { error: 'Not enough resource to sell' });
-          const revenue = Math.max(0, amount - TRADE_FEE);
           p.resources[resource] -= amount;
-          p.credits += revenue;
-          appendEvent(p, room.year, `💳 Sold ${amount} ${resource} for ${revenue} credits`);
+          p.tradeOrders.push({ id: randomUUID(), mode, resource, amount, ticksRemaining: TRADE_DELAY_TICKS });
+          appendEvent(p, room.year, `📦 Sell order placed: ${amount} ${resource} settles in ${TRADE_DELAY_MONTHS} months`);
         }
+      } else if (type === 'set_auto_trade') {
+        const resource = payload.resource;
+        const amount = Math.floor(Number(payload.amount || 0));
+        const mode = payload.mode === 'sell' ? 'sell' : 'buy';
+        if (!RESOURCE_KEYS.includes(resource)) return writeJson(res, 400, { error: 'Invalid resource' });
+        if (!Number.isInteger(amount) || amount < 1) return writeJson(res, 400, { error: 'Invalid amount' });
+        p.autoTrades[resource] = { mode, amount };
+        appendEvent(p, room.year, `🔁 Auto trade set: ${mode} ${amount} ${resource} every year`);
+      } else if (type === 'cancel_auto_trade') {
+        const resource = payload.resource;
+        if (!RESOURCE_KEYS.includes(resource)) return writeJson(res, 400, { error: 'Invalid resource' });
+        if (!p.autoTrades[resource]) return writeJson(res, 400, { error: 'No auto trade set' });
+        p.autoTrades[resource] = null;
+        appendEvent(p, room.year, `🛑 Auto trade cancelled for ${resource}`);
       } else if (type === 'chat') {
         const msg = String(payload.text || '').slice(0, 240);
         if (!msg) return writeJson(res, 400, { error: 'Empty message' });
@@ -660,7 +770,18 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === '/api/meta' && req.method === 'GET') {
-      return writeJson(res, 200, { buildings: BUILDINGS, units: UNITS, research: RESEARCH, resources: RESOURCE_KEYS, tickMs: TICK_MS, ticksPerMonth: TICKS_PER_MONTH, ticksPerYear: TICKS_PER_YEAR, tradeFee: TRADE_FEE });
+      return writeJson(res, 200, {
+        buildings: BUILDINGS,
+        units: UNITS,
+        research: RESEARCH,
+        resources: RESOURCE_KEYS,
+        tickMs: TICK_MS,
+        ticksPerMonth: TICKS_PER_MONTH,
+        ticksPerYear: TICKS_PER_YEAR,
+        tradeFee: TRADE_FEE,
+        tradeDelayMonths: TRADE_DELAY_MONTHS,
+        tradePrices: TRADE_PRICES
+      });
     }
 
     let filePath = url.pathname === '/' ? '/index.html' : url.pathname;

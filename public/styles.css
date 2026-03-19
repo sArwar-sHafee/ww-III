@@ -266,6 +266,44 @@ button:disabled {
 
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
+.trade-card {
+  gap: 0.75rem;
+}
+
+.trade-auto-toggle {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.trade-amount-row {
+  align-items: center;
+}
+
+.trade-slider {
+  flex: 1 1 180px;
+  min-width: 140px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  accent-color: var(--accent-cyan);
+}
+
+.trade-number {
+  width: 96px;
+}
+
+.trade-order-list {
+  display: grid;
+  gap: 4px;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.trade-actions {
+  margin-top: auto;
+}
+
 .compact input {
   width: 60px;
 }
@@ -487,6 +525,12 @@ button:disabled {
   .row > *,
   .stepper > * {
     max-width: 100%;
+  }
+
+  .trade-slider,
+  .trade-number {
+    width: 100%;
+    min-width: 0;
   }
 
   input,

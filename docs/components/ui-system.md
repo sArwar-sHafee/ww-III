@@ -21,5 +21,8 @@ Render the text-only UI from server state and submit player actions.
 ## Rules
 - Credits are always visible in the UI.
 - Trade uses a per-transaction credit fee.
+- Manual trade orders settle after 3 months instead of resolving instantly.
+- Trade amounts support sliders and numeric entry, with limits derived from current stock, credits, and storage.
+- Auto trade can buy or sell a configured amount once per year until cancelled.
 - Supports is the renamed structure-management tab.
 - War Room uses dynamic assault and missile selections driven by unit metadata.

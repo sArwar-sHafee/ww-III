@@ -16,6 +16,7 @@ const state = {
   forceTabRefresh: false,
   unitDrafts: {},
   tradeDrafts: {},
+  tradeAutoFlags: {},
   selectedMissile: 'ballistic_missile',
   warRoomDraft: {}
 };
@@ -133,6 +134,22 @@ function getCountdownSeconds() {
   return Math.max(0, Math.ceil((targetTime - Date.now()) / 1000));
 }
 
+function getStatusCountdownMessage() {
+  return `Opponent connected. Match starts in ${getCountdownSeconds()}s.`;
+}
+
+function getDashboardSummary() {
+  if (!state.game) return '';
+  if (state.game.phase === 'countdown') return `Match begins in ${getCountdownSeconds()} seconds.`;
+  if (state.game.phase === 'waiting') return 'Share the room code and wait for your opponent to connect.';
+  if (state.game.phase === 'finished') return 'The match has ended.';
+  return 'Queue actions before the next year resolves.';
+}
+
+function getSidebarCountdownLabel() {
+  return state.game?.phase === 'countdown' ? `${getCountdownSeconds()}s to start` : `${getCountdownSeconds()}s`;
+}
+
 function getConnectionLabel() {
   if (state.connection === 'live') return 'Live sync';
   if (state.connection === 'polling') return 'Reconnecting';
@@ -147,7 +164,7 @@ function renderStatusBanner() {
   if (state.roomId && !state.game) parts.push({ type: 'info', message: `Connecting to room ${state.roomId}...` });
   if (state.game) {
     if (phase === 'waiting') parts.push({ type: 'info', message: `Room ${state.roomId} created. Share the 4-digit code with your opponent.` });
-    if (phase === 'countdown') parts.push({ type: 'warn', message: `Opponent connected. Match starts in ${getCountdownSeconds()}s.` });
+    if (phase === 'countdown') parts.push({ type: 'warn', message: getStatusCountdownMessage(), id: 'statusCountdown' });
     if (phase === 'finished') parts.push({ type: state.game.winner === state.playerId ? 'success' : 'error', message: getPhaseLabel() });
     if (state.connection !== 'live') parts.push({ type: 'warn', message: getConnectionLabel() });
   }
@@ -165,7 +182,7 @@ function renderStatusBanner() {
     : 'info';
 
   statusBannerEl.className = `status ${tone}`;
-  statusBannerEl.innerHTML = parts.map((part) => `<div>${part.message}</div>`).join('');
+  statusBannerEl.innerHTML = parts.map((part) => `<div${part.id ? ` id="${part.id}"` : ''}>${part.message}</div>`).join('');
 }
 
 function getResourceCapacity(resourceKey, buildings) {
@@ -203,7 +220,23 @@ function getTabSignature(game) {
     });
   }
 
-  if (state.tab === 'economy' || state.tab === 'supports' || state.tab === 'trade') {
+  if (state.tab === 'trade') {
+    return JSON.stringify({
+      phase,
+      credits: you.credits,
+      buildings: you.buildings,
+      resources: flooredResources(you.resources),
+      tradeOrders: (you.tradeOrders || []).map((order) => ({
+        id: order.id,
+        resource: order.resource,
+        mode: order.mode,
+        amount: order.amount
+      })),
+      autoTrades: you.autoTrades
+    });
+  }
+
+  if (state.tab === 'economy' || state.tab === 'supports') {
     return JSON.stringify({
       phase,
       credits: you.credits,
@@ -265,14 +298,181 @@ function updateWarRoomDraft(field, value) {
   state.warRoomDraft[field] = Math.max(0, Math.min(Number(value || 0), max));
 }
 
-function getTradeDraft(resource) {
-  return Math.max(1, Number(state.tradeDrafts[resource] || 1));
+function getTradeUnitPrice(resource) {
+  return state.meta?.tradePrices?.[resource] || 1;
 }
 
-function adjustTradeDraft(resource, delta) {
-  state.tradeDrafts[resource] = Math.max(1, getTradeDraft(resource) + delta);
-  state.forceTabRefresh = true;
-  renderAll();
+function getTradeBuyCost(resource, amount) {
+  return amount * getTradeUnitPrice(resource) + (state.meta?.tradeFee || 1);
+}
+
+function getTradeSellReturn(resource, amount) {
+  return Math.max(0, amount * getTradeUnitPrice(resource) - (state.meta?.tradeFee || 1));
+}
+
+function isTradeAutoMode(resource) {
+  if (typeof state.tradeAutoFlags[resource] === 'boolean') return state.tradeAutoFlags[resource];
+  return Boolean(state.game?.you?.autoTrades?.[resource]);
+}
+
+function getTradeCardState(resource) {
+  const you = state.game?.you;
+  const stock = Math.floor(you?.resources?.[resource] || 0);
+  const credits = Math.floor(you?.credits || 0);
+  const price = getTradeUnitPrice(resource);
+  const fee = state.meta?.tradeFee || 1;
+  const capacity = getResourceCapacity(resource, you?.buildings || {});
+  const freeSpace = Number.isFinite(capacity) ? Math.max(0, Math.floor(capacity - stock)) : Infinity;
+  const buyMaxByCredits = credits >= fee + price ? Math.floor((credits - fee) / price) : 0;
+  const buyMax = Math.max(0, Math.min(buyMaxByCredits, freeSpace));
+  const sellMax = stock;
+  const autoTrade = you?.autoTrades?.[resource] || null;
+  const sliderMax = Math.max(0, buyMax, sellMax, autoTrade?.amount || 0);
+  const rawDraft = Math.floor(Number(state.tradeDrafts[resource]));
+  const fallbackDraft = autoTrade?.amount || (sliderMax > 0 ? 1 : 0);
+  const amount = sliderMax > 0
+    ? Math.max(1, Math.min(Number.isFinite(rawDraft) && rawDraft >= 1 ? rawDraft : fallbackDraft, sliderMax))
+    : 0;
+
+  state.tradeDrafts[resource] = amount;
+
+  const phaseActive = state.game?.phase === 'active';
+  const buyDisabled = !phaseActive || amount < 1 || amount > buyMax;
+  const sellDisabled = !phaseActive || amount < 1 || amount > sellMax;
+
+  return {
+    amount,
+    autoTrade,
+    buyCost: amount > 0 ? getTradeBuyCost(resource, amount) : 0,
+    buyDisabled,
+    buyMax,
+    capacity,
+    fee,
+    phaseActive,
+    price,
+    sellDisabled,
+    sellMax,
+    sellReturn: amount > 0 ? getTradeSellReturn(resource, amount) : 0,
+    sliderMax,
+    stock
+  };
+}
+
+function setTradeDraft(resource, value) {
+  const { sliderMax } = getTradeCardState(resource);
+  if (sliderMax <= 0) {
+    state.tradeDrafts[resource] = 0;
+    return;
+  }
+  const next = Math.floor(Number(value));
+  state.tradeDrafts[resource] = Math.max(1, Math.min(Number.isFinite(next) ? next : 1, sliderMax));
+}
+
+function getTradeReason(kind, tradeState) {
+  if (!tradeState.phaseActive) return 'Match not active';
+  if (tradeState.amount < 1) return 'Choose an amount';
+  if (kind === 'buy' && tradeState.amount > tradeState.buyMax) return `Buy max ${tradeState.buyMax}`;
+  if (kind === 'sell' && tradeState.amount > tradeState.sellMax) return `Sell max ${tradeState.sellMax}`;
+  return '';
+}
+
+function getTradeOrderLabel(order) {
+  const months = ticksToMonths(order.ticksRemaining);
+  return `${order.mode === 'buy' ? 'Buy' : 'Sell'} ${order.amount} ${order.resource} settles in ${months} month${months === 1 ? '' : 's'}.`;
+}
+
+function updateTradeCardPreview(resource) {
+  if (state.tab !== 'trade') return;
+
+  const tradeState = getTradeCardState(resource);
+  const autoMode = isTradeAutoMode(resource);
+  const buyLabel = autoMode
+    ? (tradeState.amount > 0 ? `Auto Buy (${tradeState.buyCost})` : 'Auto Buy')
+    : (tradeState.amount > 0 ? `Buy (${tradeState.buyCost})` : 'Buy');
+  const sellLabel = autoMode
+    ? (tradeState.amount > 0 ? `Auto Sell (+${tradeState.sellReturn})` : 'Auto Sell')
+    : (tradeState.amount > 0 ? `Sell (+${tradeState.sellReturn})` : 'Sell');
+
+  const sliderEl = tabContent.querySelector(`[data-trade-slider="${resource}"]`);
+  if (sliderEl) {
+    sliderEl.max = String(tradeState.sliderMax);
+    sliderEl.value = String(tradeState.amount);
+    sliderEl.disabled = tradeState.sliderMax < 1;
+  }
+
+  const numberEl = tabContent.querySelector(`[data-trade-number="${resource}"]`);
+  if (numberEl) {
+    numberEl.max = String(tradeState.sliderMax);
+    numberEl.value = String(tradeState.amount);
+    numberEl.disabled = tradeState.sliderMax < 1;
+  }
+
+  const limitsEl = tabContent.querySelector(`[data-trade-limits="${resource}"]`);
+  if (limitsEl) limitsEl.textContent = `Buy max: ${tradeState.buyMax} | Sell max: ${tradeState.sellMax}`;
+
+  const buyBtn = tabContent.querySelector(`[data-trade-buy="${resource}"]`);
+  if (buyBtn) {
+    buyBtn.textContent = buyLabel;
+    buyBtn.disabled = tradeState.buyDisabled;
+    buyBtn.title = getTradeReason('buy', tradeState);
+  }
+
+  const sellBtn = tabContent.querySelector(`[data-trade-sell="${resource}"]`);
+  if (sellBtn) {
+    sellBtn.textContent = sellLabel;
+    sellBtn.disabled = tradeState.sellDisabled;
+    sellBtn.title = getTradeReason('sell', tradeState);
+  }
+}
+
+function bindTradeControls() {
+  tabContent.querySelectorAll('[data-trade-slider]').forEach((input) => {
+    input.addEventListener('input', (event) => {
+      const resource = event.target.dataset.tradeSlider;
+      setTradeDraft(resource, event.target.value);
+      updateTradeCardPreview(resource);
+    });
+  });
+
+  tabContent.querySelectorAll('[data-trade-number]').forEach((input) => {
+    const sync = (event) => {
+      const resource = event.target.dataset.tradeNumber;
+      setTradeDraft(resource, event.target.value);
+      updateTradeCardPreview(resource);
+    };
+    input.addEventListener('input', sync);
+    input.addEventListener('change', sync);
+  });
+
+  tabContent.querySelectorAll('[data-trade-auto-toggle]').forEach((input) => {
+    input.addEventListener('change', (event) => {
+      const resource = event.target.dataset.tradeAutoToggle;
+      state.tradeAutoFlags[resource] = event.target.checked;
+      renderTrade();
+    });
+  });
+
+  tabContent.querySelectorAll('[data-trade-buy]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const resource = button.dataset.tradeBuy;
+      const { amount } = getTradeCardState(resource);
+      const action = isTradeAutoMode(resource) ? 'set_auto_trade' : 'trade';
+      sendAction(action, { resource, mode: 'buy', amount });
+    });
+  });
+
+  tabContent.querySelectorAll('[data-trade-sell]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const resource = button.dataset.tradeSell;
+      const { amount } = getTradeCardState(resource);
+      const action = isTradeAutoMode(resource) ? 'set_auto_trade' : 'trade';
+      sendAction(action, { resource, mode: 'sell', amount });
+    });
+  });
+
+  tabContent.querySelectorAll('[data-trade-cancel-auto]').forEach((button) => {
+    button.addEventListener('click', () => sendAction('cancel_auto_trade', { resource: button.dataset.tradeCancelAuto }));
+  });
 }
 
 function getUnitDraft(id) {
@@ -454,13 +654,6 @@ function renderDashboard() {
   const you = state.game.you;
   const opponent = state.game.opponent?.name || 'Waiting...';
   const roomCode = `<b>${state.game.roomId}</b>`;
-  const summary = state.game.phase === 'countdown'
-    ? `Match begins in ${getCountdownSeconds()} seconds.`
-    : state.game.phase === 'waiting'
-      ? 'Share the room code and wait for your opponent to connect.'
-      : state.game.phase === 'finished'
-        ? 'The match has ended.'
-        : 'Queue actions before the next year resolves.';
 
   tabContent.innerHTML = `
     <h3>Dashboard</h3>
@@ -472,7 +665,7 @@ function renderDashboard() {
         <div class="small">Opponent: ${opponent}</div>
         <div class="small">💳 Credits: ${you.credits}</div>
         <div class="small">Phase: ${getPhaseLabel()}</div>
-        <div class="small">${summary}</div>
+        <div class="small" id="dashboardSummary">${getDashboardSummary()}</div>
       </div>
       <div class="card">
         <b>Connection</b>
@@ -576,38 +769,55 @@ function renderDefences() {
 function renderTrade() {
   const you = state.game.you;
   const rows = state.meta.resources.map((resource) => {
-    const amount = getTradeDraft(resource);
-    const buyCost = amount + (state.meta.tradeFee || 1);
-    const sellReturn = Math.max(0, amount - (state.meta.tradeFee || 1));
-    const buyDisabled = state.game.phase !== 'active' || you.credits < buyCost;
-    const sellDisabled = state.game.phase !== 'active' || (you.resources[resource] || 0) < amount;
-    return `<div class="card">
+    const tradeState = getTradeCardState(resource);
+    const autoMode = isTradeAutoMode(resource);
+    const orders = (you.tradeOrders || []).filter((order) => order.resource === resource);
+    const buyLabel = autoMode
+      ? (tradeState.amount > 0 ? `Auto Buy (${tradeState.buyCost})` : 'Auto Buy')
+      : (tradeState.amount > 0 ? `Buy (${tradeState.buyCost})` : 'Buy');
+    const sellLabel = autoMode
+      ? (tradeState.amount > 0 ? `Auto Sell (+${tradeState.sellReturn})` : 'Auto Sell')
+      : (tradeState.amount > 0 ? `Sell (+${tradeState.sellReturn})` : 'Sell');
+    const storageText = Number.isFinite(tradeState.capacity)
+      ? `${tradeState.stock}/${Math.floor(tradeState.capacity)}`
+      : String(tradeState.stock);
+
+    return `<div class="card trade-card">
       <b>${emojis[resource] || ''} ${resource}</b>
-      <div class="small">Stock: ${Math.floor(you.resources[resource] || 0)} | Credits: ${you.credits}</div>
-      <div class="small">Rate: 1 credit per unit + ${state.meta.tradeFee || 1} credit trade fee</div>
-      <div class="row stepper">
-        ${actionBtn('-', () => adjustTradeDraft(resource, -1))}
-        <input id="trade_${resource}" value="${amount}" type="number" min="1" readonly />
-        ${actionBtn('+', () => adjustTradeDraft(resource, 1))}
+      <div class="small">Stock: ${storageText} | Credits: ${you.credits}</div>
+      <div class="small">Rate: ${tradeState.price} credit${tradeState.price === 1 ? '' : 's'} per unit + ${tradeState.fee} credit trade fee</div>
+      <div class="small">Manual trades settle in ${state.meta.tradeDelayMonths || 3} months. Auto trade executes yearly.</div>
+      <label class="small trade-auto-toggle">
+        <input type="checkbox" data-trade-auto-toggle="${resource}" ${autoMode ? 'checked' : ''} />
+        Auto trade
+      </label>
+      <div class="row trade-amount-row">
+        <input class="trade-slider" data-trade-slider="${resource}" type="range" min="0" max="${tradeState.sliderMax}" step="1" value="${tradeState.amount}" ${tradeState.sliderMax < 1 ? 'disabled' : ''} />
+        <input class="trade-number" data-trade-number="${resource}" type="number" min="0" max="${tradeState.sliderMax}" step="1" value="${tradeState.amount}" ${tradeState.sliderMax < 1 ? 'disabled' : ''} />
       </div>
-      <div class="row">
-        ${actionBtn(`Buy (${buyCost})`, () => sendAction('trade', { mode: 'buy', resource, amount }), { disabled: buyDisabled, title: buyDisabled ? 'Not enough credits or match inactive' : '' })}
-        ${actionBtn(`Sell (+${sellReturn})`, () => sendAction('trade', { mode: 'sell', resource, amount }), { disabled: sellDisabled, title: sellDisabled ? 'Not enough stock or match inactive' : '' })}
+      <div class="small" data-trade-limits="${resource}">Buy max: ${tradeState.buyMax} | Sell max: ${tradeState.sellMax}</div>
+      ${tradeState.autoTrade ? `<div class="small">🔁 Active auto trade: ${tradeState.autoTrade.mode} ${tradeState.autoTrade.amount} ${resource} yearly</div>` : ''}
+      ${orders.length ? `<div class="trade-order-list">${orders.map((order) => `<div class="small" data-trade-order-id="${order.id}">${getTradeOrderLabel(order)}</div>`).join('')}</div>` : ''}
+      <div class="row trade-actions">
+        <button type="button" data-trade-buy="${resource}" ${tradeState.buyDisabled ? 'disabled' : ''} title="${getTradeReason('buy', tradeState)}">${buyLabel}</button>
+        <button type="button" data-trade-sell="${resource}" ${tradeState.sellDisabled ? 'disabled' : ''} title="${getTradeReason('sell', tradeState)}">${sellLabel}</button>
+        ${tradeState.autoTrade ? `<button type="button" data-trade-cancel-auto="${resource}">Cancel Auto</button>` : ''}
       </div>
     </div>`;
   }).join('');
 
   tabContent.innerHTML = `
     <h3>Trade</h3>
-    <div class="small">Population generates credits at year end. Each trade uses a 1-credit fee on top of the buy or sell amount.</div>
+    <div class="small">Population generates credits at year end. Manual trades reserve the selected amount now and settle after ${state.meta.tradeDelayMonths || 3} months.</div>
     <div class="small">Treasury: ${you.credits} credits</div>
     <div class="action-grid">${rows}</div>
   `;
+
+  bindTradeControls();
 }
 
 function renderSidebar() {
   const you = state.game.you;
-  const countdown = state.game.phase === 'countdown' ? `${getCountdownSeconds()}s to start` : `${getCountdownSeconds()}s`;
   const resourceRows = state.meta.resources.map((resource) => {
     const value = Math.floor(you.resources[resource]);
     const net = you.net?.[resource] ?? 0;
@@ -631,7 +841,7 @@ function renderSidebar() {
   sidebarContentEl.innerHTML = `
     <h3>Command Summary</h3>
     <div class="small">📅 Year ${state.game.year}, Month ${state.game.month}</div>
-    <div class="small">⏱️ ${countdown}</div>
+    <div class="small" id="sidebarCountdown">⏱️ ${getSidebarCountdownLabel()}</div>
     <div class="small">👥 Population ${you.population}/${you.populationMax}</div>
     <div class="small">💳 Credits ${you.credits}</div>
     <div class="small">🎯 ${getPhaseLabel()}</div>
@@ -666,6 +876,27 @@ function renderSidebar() {
       </div>
     </div>
   `;
+}
+
+function refreshLiveCountdowns() {
+  if (!state.game) return;
+
+  const sidebarCountdownEl = document.getElementById('sidebarCountdown');
+  if (sidebarCountdownEl) sidebarCountdownEl.textContent = `⏱️ ${getSidebarCountdownLabel()}`;
+
+  const dashboardSummaryEl = document.getElementById('dashboardSummary');
+  if (dashboardSummaryEl) dashboardSummaryEl.textContent = getDashboardSummary();
+
+  const statusCountdownEl = document.getElementById('statusCountdown');
+  if (statusCountdownEl) statusCountdownEl.textContent = getStatusCountdownMessage();
+
+  if (state.tab === 'trade') {
+    const ordersById = Object.fromEntries((state.game.you.tradeOrders || []).map((order) => [order.id, order]));
+    document.querySelectorAll('[data-trade-order-id]').forEach((el) => {
+      const order = ordersById[el.dataset.tradeOrderId];
+      if (order) el.textContent = getTradeOrderLabel(order);
+    });
+  }
 }
 
 function renderResearch() {
@@ -916,6 +1147,6 @@ chatInputEl.addEventListener('keydown', (event) => {
   }
 });
 
-setInterval(() => state.game && renderSidebar(), 1000);
+setInterval(() => refreshLiveCountdowns(), 1000);
 
 ensureMeta().then(() => restoreSession());
