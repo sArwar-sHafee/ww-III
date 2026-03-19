@@ -23,6 +23,7 @@ const state = {
 
 const DEFAULT_API_ORIGIN = 'https://ww-iii.onrender.com';
 const API_ORIGIN = window.WWIII_API_ORIGIN || (window.location.hostname.endsWith('.vercel.app') ? DEFAULT_API_ORIGIN : '');
+const DEFAULT_RESOURCE_CAPACITY = 999999;
 const emojis = {
   credits: '💳',
   nutrition: '🍲', lumber: '🪵', steel: '🔩', alloy: '🪙', oil: '🛢️', magnet: '🧲', electricity: '⚡', glass: '🪟', polymer: '♻️', concrete: '🧱', silicon: '💾',
@@ -186,10 +187,10 @@ function renderStatusBanner() {
 }
 
 function getResourceCapacity(resourceKey, buildings) {
-  let capacity = Infinity;
+  let capacity = DEFAULT_RESOURCE_CAPACITY;
   for (const [id, count] of Object.entries(buildings || {})) {
     const cap = state.meta.buildings[id]?.capacity?.[resourceKey];
-    if (cap) capacity = Number.isFinite(capacity) ? capacity + cap * count : cap * count;
+    if (cap) capacity += cap * count;
   }
   return capacity;
 }
@@ -386,12 +387,10 @@ function updateTradeCardPreview(resource) {
 
   const tradeState = getTradeCardState(resource);
   const autoMode = isTradeAutoMode(resource);
-  const buyLabel = autoMode
-    ? (tradeState.amount > 0 ? `Auto Buy (${tradeState.buyCost})` : 'Auto Buy')
-    : (tradeState.amount > 0 ? `Buy (${tradeState.buyCost})` : 'Buy');
-  const sellLabel = autoMode
-    ? (tradeState.amount > 0 ? `Auto Sell (+${tradeState.sellReturn})` : 'Auto Sell')
-    : (tradeState.amount > 0 ? `Sell (+${tradeState.sellReturn})` : 'Sell');
+  const autoTradeLocked = autoMode && Boolean(tradeState.autoTrade);
+  const actionDisabledReason = autoTradeLocked ? 'Cancel auto trade to change it' : '';
+  const buyLabel = autoMode ? 'Auto Buy' : 'Buy';
+  const sellLabel = autoMode ? 'Auto Sell' : 'Sell';
 
   const sliderEl = tabContent.querySelector(`[data-trade-slider="${resource}"]`);
   if (sliderEl) {
@@ -400,12 +399,8 @@ function updateTradeCardPreview(resource) {
     sliderEl.disabled = tradeState.sliderMax < 1;
   }
 
-  const numberEl = tabContent.querySelector(`[data-trade-number="${resource}"]`);
-  if (numberEl) {
-    numberEl.max = String(tradeState.sliderMax);
-    numberEl.value = String(tradeState.amount);
-    numberEl.disabled = tradeState.sliderMax < 1;
-  }
+  const amountEl = tabContent.querySelector(`[data-trade-amount="${resource}"]`);
+  if (amountEl) amountEl.textContent = `Selected amount: ${tradeState.amount}`;
 
   const limitsEl = tabContent.querySelector(`[data-trade-limits="${resource}"]`);
   if (limitsEl) limitsEl.textContent = `Buy max: ${tradeState.buyMax} | Sell max: ${tradeState.sellMax}`;
@@ -413,15 +408,15 @@ function updateTradeCardPreview(resource) {
   const buyBtn = tabContent.querySelector(`[data-trade-buy="${resource}"]`);
   if (buyBtn) {
     buyBtn.textContent = buyLabel;
-    buyBtn.disabled = tradeState.buyDisabled;
-    buyBtn.title = getTradeReason('buy', tradeState);
+    buyBtn.disabled = autoTradeLocked || tradeState.buyDisabled;
+    buyBtn.title = actionDisabledReason || getTradeReason('buy', tradeState);
   }
 
   const sellBtn = tabContent.querySelector(`[data-trade-sell="${resource}"]`);
   if (sellBtn) {
     sellBtn.textContent = sellLabel;
-    sellBtn.disabled = tradeState.sellDisabled;
-    sellBtn.title = getTradeReason('sell', tradeState);
+    sellBtn.disabled = autoTradeLocked || tradeState.sellDisabled;
+    sellBtn.title = actionDisabledReason || getTradeReason('sell', tradeState);
   }
 }
 
@@ -432,16 +427,6 @@ function bindTradeControls() {
       setTradeDraft(resource, event.target.value);
       updateTradeCardPreview(resource);
     });
-  });
-
-  tabContent.querySelectorAll('[data-trade-number]').forEach((input) => {
-    const sync = (event) => {
-      const resource = event.target.dataset.tradeNumber;
-      setTradeDraft(resource, event.target.value);
-      updateTradeCardPreview(resource);
-    };
-    input.addEventListener('input', sync);
-    input.addEventListener('change', sync);
   });
 
   tabContent.querySelectorAll('[data-trade-auto-toggle]').forEach((input) => {
@@ -771,36 +756,30 @@ function renderTrade() {
   const rows = state.meta.resources.map((resource) => {
     const tradeState = getTradeCardState(resource);
     const autoMode = isTradeAutoMode(resource);
+    const autoTradeLocked = autoMode && Boolean(tradeState.autoTrade);
     const orders = (you.tradeOrders || []).filter((order) => order.resource === resource);
-    const buyLabel = autoMode
-      ? (tradeState.amount > 0 ? `Auto Buy (${tradeState.buyCost})` : 'Auto Buy')
-      : (tradeState.amount > 0 ? `Buy (${tradeState.buyCost})` : 'Buy');
-    const sellLabel = autoMode
-      ? (tradeState.amount > 0 ? `Auto Sell (+${tradeState.sellReturn})` : 'Auto Sell')
-      : (tradeState.amount > 0 ? `Sell (+${tradeState.sellReturn})` : 'Sell');
-    const storageText = Number.isFinite(tradeState.capacity)
-      ? `${tradeState.stock}/${Math.floor(tradeState.capacity)}`
-      : String(tradeState.stock);
+    const buyLabel = autoMode ? 'Auto Buy' : 'Buy';
+    const sellLabel = autoMode ? 'Auto Sell' : 'Sell';
+    const actionDisabledReason = autoTradeLocked ? 'Cancel auto trade to change it' : '';
 
     return `<div class="card trade-card">
       <b>${emojis[resource] || ''} ${resource}</b>
-      <div class="small">Stock: ${storageText} | Credits: ${you.credits}</div>
+      <div class="small">Stock: ${tradeState.stock} | Credits: ${you.credits}</div>
       <div class="small">Rate: ${tradeState.price} credit${tradeState.price === 1 ? '' : 's'} per unit + ${tradeState.fee} credit trade fee</div>
-      <div class="small">Manual trades settle in ${state.meta.tradeDelayMonths || 3} months. Auto trade executes yearly.</div>
       <label class="small trade-auto-toggle">
         <input type="checkbox" data-trade-auto-toggle="${resource}" ${autoMode ? 'checked' : ''} />
         Auto trade
       </label>
       <div class="row trade-amount-row">
         <input class="trade-slider" data-trade-slider="${resource}" type="range" min="0" max="${tradeState.sliderMax}" step="1" value="${tradeState.amount}" ${tradeState.sliderMax < 1 ? 'disabled' : ''} />
-        <input class="trade-number" data-trade-number="${resource}" type="number" min="0" max="${tradeState.sliderMax}" step="1" value="${tradeState.amount}" ${tradeState.sliderMax < 1 ? 'disabled' : ''} />
       </div>
+      <div class="small trade-amount-display" data-trade-amount="${resource}">Selected amount: ${tradeState.amount}</div>
       <div class="small" data-trade-limits="${resource}">Buy max: ${tradeState.buyMax} | Sell max: ${tradeState.sellMax}</div>
       ${tradeState.autoTrade ? `<div class="small">🔁 Active auto trade: ${tradeState.autoTrade.mode} ${tradeState.autoTrade.amount} ${resource} yearly</div>` : ''}
       ${orders.length ? `<div class="trade-order-list">${orders.map((order) => `<div class="small" data-trade-order-id="${order.id}">${getTradeOrderLabel(order)}</div>`).join('')}</div>` : ''}
       <div class="row trade-actions">
-        <button type="button" data-trade-buy="${resource}" ${tradeState.buyDisabled ? 'disabled' : ''} title="${getTradeReason('buy', tradeState)}">${buyLabel}</button>
-        <button type="button" data-trade-sell="${resource}" ${tradeState.sellDisabled ? 'disabled' : ''} title="${getTradeReason('sell', tradeState)}">${sellLabel}</button>
+        <button type="button" data-trade-buy="${resource}" ${autoTradeLocked || tradeState.buyDisabled ? 'disabled' : ''} title="${actionDisabledReason || getTradeReason('buy', tradeState)}">${buyLabel}</button>
+        <button type="button" data-trade-sell="${resource}" ${autoTradeLocked || tradeState.sellDisabled ? 'disabled' : ''} title="${actionDisabledReason || getTradeReason('sell', tradeState)}">${sellLabel}</button>
         ${tradeState.autoTrade ? `<button type="button" data-trade-cancel-auto="${resource}">Cancel Auto</button>` : ''}
       </div>
     </div>`;

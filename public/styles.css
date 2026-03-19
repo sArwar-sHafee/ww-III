@@ -289,8 +289,11 @@ button:disabled {
   accent-color: var(--accent-cyan);
 }
 
-.trade-number {
-  width: 96px;
+.trade-amount-display {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .trade-order-list {
@@ -528,7 +531,7 @@ button:disabled {
   }
 
   .trade-slider,
-  .trade-number {
+  .trade-amount-display {
     width: 100%;
     min-width: 0;
   }
