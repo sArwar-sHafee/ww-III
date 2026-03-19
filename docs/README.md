@@ -26,6 +26,7 @@ This documentation describes the component-level design for `ww-III` (text-based
 - `docs/economy/capacity-and-loss.md`
 
 ## Rules and Events
+- `docs/rules/war-condition.md`
 - `docs/rules/victory-conditions.md`
 - `docs/rules/war-room.md`
 - `docs/data/events.md`

@@ -4,6 +4,7 @@
 - `roomId`: 4-digit string
 - `year`: integer
 - `month`: integer
+- `warCondition`: derived object `{code, label, description}`
 - `tickEndsAt`: server timestamp
 - `yearEndsAt`: server timestamp
 - `players`: map of `playerId -> PlayerState`

@@ -17,8 +17,12 @@ const state = {
   unitDrafts: {},
   tradeDrafts: {},
   tradeAutoFlags: {},
+  selectedScoutTarget: 'economy',
   selectedMissile: 'ballistic_missile',
-  warRoomDraft: {}
+  selectedMissileTarget: 'economy',
+  selectedAssaultTarget: 'economy',
+  warRoomDraft: {},
+  lockUiActive: false
 };
 
 const DEFAULT_API_ORIGIN = 'https://ww-iii.onrender.com';
@@ -26,13 +30,17 @@ const API_ORIGIN = window.WWIII_API_ORIGIN || (window.location.hostname.endsWith
 const DEFAULT_RESOURCE_CAPACITY = 999999;
 const emojis = {
   credits: '💳',
+  people: '👥',
+  economy: '💹',
+  buildings: '🏗️',
+  research_center: '🧠',
   nutrition: '🍲', lumber: '🪵', steel: '🔩', alloy: '🪙', oil: '🛢️', magnet: '🧲', electricity: '⚡', glass: '🪟', polymer: '♻️', concrete: '🧱', silicon: '💾',
   farm: '🌾', lumber_camp: '🪓', steel_mill: '🏭', alloy_quarry: '⛏️', oil_rig: '🛢️', magnet_extractor: '🧲', power_plant: '⚡', glassworks: '🪟', polymer_plant: '🧪', concrete_plant: '🧱', silicon_refinery: '💾',
   shelter: '🏠', barracks: '🪖', factory: '🏭', radar_station: '📡', dry_dock: '⚓', airfield: '🛫',
   anti_missile_battery: '🛡️', land_mine: '💣',
   infantry: '🪖', special_force: '🎖️', tank: '🛞', war_ship: '🚢', submarine: '🚤', fighter_zed: '🛩️', attack_helicopter: '🚁', combat_drone: '🤖', ballistic_missile: '🚀', cruise_missile: '🛰️', scout_drone: '📡', anti_tank_squad: '🧨', naval_strike_missile: '🚀', air_defence_gun: '🎯'
 };
-const tabs = ['dashboard', 'economy', 'trade', 'supports', 'military', 'defences', 'research', 'war_room'];
+const tabs = ['dashboard', 'economy', 'trade', 'supports', 'military', 'defences', 'research', 'war_room', 'defence_room', 'opponent_intel'];
 const tabLabels = {
   dashboard: 'Dashboard',
   economy: 'Economy',
@@ -41,7 +49,9 @@ const tabLabels = {
   military: 'Military',
   defences: 'Defences',
   research: 'Research',
-  war_room: 'War Room'
+  war_room: 'War Room',
+  defence_room: 'Defence Room',
+  opponent_intel: 'Opponent Intel'
 };
 
 const eventsEl = document.getElementById('events');
@@ -147,6 +157,14 @@ function getDashboardSummary() {
   return 'Queue actions before the next year resolves.';
 }
 
+function getWarConditionLabel() {
+  return state.game?.warCondition?.label || 'Unknown';
+}
+
+function getWarConditionDescription() {
+  return state.game?.warCondition?.description || '';
+}
+
 function getSidebarCountdownLabel() {
   return state.game?.phase === 'countdown' ? `${getCountdownSeconds()}s to start` : `${getCountdownSeconds()}s`;
 }
@@ -156,6 +174,39 @@ function getConnectionLabel() {
   if (state.connection === 'polling') return 'Reconnecting';
   if (state.connection === 'restoring') return 'Restoring session';
   return 'Offline';
+}
+
+function getTargetBuckets() {
+  return Object.entries(state.meta?.targetBuckets || {});
+}
+
+function getTargetLabel(bucket) {
+  return state.meta?.targetBuckets?.[bucket]?.label || bucket.replace(/_/g, ' ');
+}
+
+function getTargetIcon(bucket) {
+  return state.meta?.targetBuckets?.[bucket]?.emoji || emojis[bucket] || '';
+}
+
+function getForcedViewLock() {
+  const forcedView = state.game?.you?.forcedView;
+  if (forcedView?.tab !== 'opponent_intel') return null;
+  if (!forcedView.lockedUntil || forcedView.lockedUntil <= Date.now()) return null;
+  return forcedView;
+}
+
+function getForcedViewSeconds() {
+  const forcedView = getForcedViewLock();
+  if (!forcedView) return 0;
+  return Math.max(0, Math.ceil((forcedView.lockedUntil - Date.now()) / 1000));
+}
+
+function escapeAttr(value) {
+  return String(value || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
+function formatAmount(value) {
+  return Number.isInteger(value) ? String(value) : String(Math.round(value * 10) / 10);
 }
 
 function renderStatusBanner() {
@@ -168,6 +219,7 @@ function renderStatusBanner() {
     if (phase === 'countdown') parts.push({ type: 'warn', message: getStatusCountdownMessage(), id: 'statusCountdown' });
     if (phase === 'finished') parts.push({ type: state.game.winner === state.playerId ? 'success' : 'error', message: getPhaseLabel() });
     if (state.connection !== 'live') parts.push({ type: 'warn', message: getConnectionLabel() });
+    if (getForcedViewLock()) parts.push({ type: 'error', message: `Opponent Intel locked for ${getForcedViewSeconds()}s.`, id: 'forcedViewCountdown' });
   }
   if (state.notice) parts.push(state.notice);
 
@@ -217,7 +269,11 @@ function getTabSignature(game) {
       winner,
       opponent: opponent?.name || '',
       pending: you.pending,
-      connection: state.connection
+      connection: state.connection,
+      credits: you.credits,
+      population: you.population,
+      populationMax: you.populationMax,
+      warCondition: game.warCondition
     });
   }
 
@@ -255,6 +311,7 @@ function getTabSignature(game) {
       buildings: you.buildings,
       buildingQueues: you.buildingQueues,
       research: you.research.completed,
+      researchDisabled: you.research.disabledUntil,
       resources: flooredResources(you.resources)
     });
   }
@@ -263,8 +320,10 @@ function getTabSignature(game) {
     return JSON.stringify({
       phase,
       buildings: you.buildings,
+      units: you.units,
       buildingQueues: you.buildingQueues,
       research: you.research.completed,
+      researchDisabled: you.research.disabledUntil,
       resources: flooredResources(you.resources)
     });
   }
@@ -275,6 +334,8 @@ function getTabSignature(game) {
       year,
       active: you.research.active,
       completed: you.research.completed,
+      disabledUntil: you.research.disabledUntil,
+      researchLockUntil: you.researchLockUntil,
       resources: flooredResources(you.resources)
     });
   }
@@ -283,11 +344,31 @@ function getTabSignature(game) {
     return JSON.stringify({
       phase,
       year,
+      warCondition: game.warCondition,
       pending: you.pending,
       units: you.units,
+      defenceAssignments: you.defenceAssignments,
       research: you.research.completed,
+      researchDisabled: you.research.disabledUntil,
       cooldown: you.scoutCooldownUntil,
       resources: flooredResources(you.resources)
+    });
+  }
+
+  if (state.tab === 'defence_room') {
+    return JSON.stringify({
+      phase,
+      units: you.units,
+      buildings: you.buildings,
+      assignments: you.defenceAssignments
+    });
+  }
+
+  if (state.tab === 'opponent_intel') {
+    return JSON.stringify({
+      phase,
+      intel: you.opponentIntelLog,
+      forcedView: you.forcedView
     });
   }
 
@@ -295,8 +376,73 @@ function getTabSignature(game) {
 }
 
 function updateWarRoomDraft(field, value) {
-  const max = state.game?.you?.units?.[field] ?? Infinity;
+  const max = getAttackAvailableCount(field);
   state.warRoomDraft[field] = Math.max(0, Math.min(Number(value || 0), max));
+}
+
+function getEntity(id) {
+  return state.meta?.units?.[id] || state.meta?.buildings?.[id] || null;
+}
+
+function getDefenceAssignableUnits() {
+  return Object.entries(state.meta?.units || {}).filter(([, unit]) => unit.defenceAssignable);
+}
+
+function getDefenceAssignableBuildings() {
+  return Object.entries(state.meta?.buildings || {}).filter(([, building]) => building.defenceAssignable);
+}
+
+function getBucketAssignments(bucket) {
+  return state.game?.you?.defenceAssignments?.[bucket] || {};
+}
+
+function getAssignedCount(id, excludeBucket = null) {
+  return Object.entries(state.game?.you?.defenceAssignments || {}).reduce((sum, [bucket, assignments]) => (
+    bucket === excludeBucket ? sum : sum + (assignments?.[id] || 0)
+  ), 0);
+}
+
+function getAttackAvailableCount(id) {
+  return Math.max(0, (state.game?.you?.units?.[id] || 0) - getAssignedCount(id));
+}
+
+function getDefenceAssignableAvailableCount(id, bucket) {
+  const you = state.game?.you;
+  const owned = Object.hasOwn(you?.units || {}, id) ? (you?.units?.[id] || 0) : (you?.buildings?.[id] || 0);
+  return Math.max(0, owned - getAssignedCount(id, bucket));
+}
+
+function formatCombatProfile(entries = []) {
+  return entries.map(([target, value]) => `${emojis[target] || ''} x ${formatAmount(value)}`).join(' | ');
+}
+
+function formatMissileIntercept(entries = []) {
+  return entries.map(([target, value]) => `${emojis[target] || ''} x ${formatAmount(value)}`).join(' | ');
+}
+
+function getCombatCapabilityLine(entity) {
+  const lines = [];
+  if (entity?.combatProfile?.length) lines.push(formatCombatProfile(entity.combatProfile));
+  if (entity?.missileIntercept?.length) lines.push(`Missile shield ${formatMissileIntercept(entity.missileIntercept)}`);
+  return lines.join(' | ');
+}
+
+function getResourceConsumptionTooltip(resource) {
+  const you = state.game?.you;
+  if (!you) return 'No yearly consumption';
+  const rows = [];
+  if (resource === 'nutrition' && you.population > 0) rows.push(`${emojis.people} - ${formatAmount(you.population * 0.8)}`);
+  for (const [id, building] of Object.entries(state.meta?.buildings || {})) {
+    const count = you.buildings?.[id] || 0;
+    const value = building.upkeep?.[resource];
+    if (count > 0 && value > 0) rows.push(`${emojis[id] || ''} - ${formatAmount(count * value)}`);
+  }
+  for (const [id, unit] of Object.entries(state.meta?.units || {})) {
+    const count = you.units?.[id] || 0;
+    const value = unit.upkeep?.[resource];
+    if (count > 0 && value > 0) rows.push(`${emojis[id] || ''} - ${formatAmount(count * value)}`);
+  }
+  return rows.length ? rows.join('\n') : 'No yearly consumption';
 }
 
 function getTradeUnitPrice(resource) {
@@ -501,17 +647,6 @@ function renderEvents() {
     text: `[Y${event.year}] ${event.message}`
   }));
 
-  const intel = state.game?.opponent?.intel;
-  if (intel?.known) {
-    events.unshift({ cls: 'error blink', text: `[INTEL] Expires Year ${intel.expiresAt}` });
-    for (const [key, value] of Object.entries(intel.buildings || {}).filter(([, amount]) => amount > 0)) {
-      events.unshift({ cls: 'error blink', text: `[INTEL] ${emojis[key] || ''} ${key.replace(/_/g, ' ')}: ${value}` });
-    }
-    for (const [key, value] of Object.entries(intel.resources || {}).filter(([, amount]) => amount > 0)) {
-      events.unshift({ cls: 'error blink', text: `[INTEL] ${emojis[key] || ''} ${key}: ${Math.floor(value)}` });
-    }
-  }
-
   eventsEl.innerHTML = events.map((event) => `<li class="${event.cls}">${event.text}</li>`).join('');
 }
 
@@ -535,6 +670,12 @@ function techLabel(id) {
   return state.meta?.research?.[id]?.name || id.replace(/_/g, ' ');
 }
 
+function hasTechOnline(id) {
+  if (!state.game?.you) return false;
+  const disabledUntil = state.game.you.research?.disabledUntil?.[id] || -1;
+  return state.game.you.research?.completed?.includes(id) && state.game.year >= disabledUntil;
+}
+
 function getMissingCost(cost, amount = 1) {
   const resources = state.game?.you.resources || {};
   return Object.entries(cost)
@@ -549,7 +690,7 @@ function getBuildCardState(id) {
   const reasons = [];
   if (state.game.phase !== 'active') reasons.push('Match not active');
   if (inQueue) reasons.push('Already building');
-  if (building.requires && !building.requires.every((tech) => you.research.completed.includes(tech))) reasons.push(`Needs ${building.requires.map(techLabel).join(', ')}`);
+  if (building.requires && !building.requires.every((tech) => hasTechOnline(tech))) reasons.push(`Needs ${building.requires.map(techLabel).join(', ')}`);
   const missing = getMissingCost(building.cost);
   if (missing.length) reasons.push(`Missing ${missing.join(', ')}`);
   return { disabled: reasons.length > 0, reasons, inQueue };
@@ -561,7 +702,7 @@ function getUnitCardState(id, amount = 1) {
   const reasons = [];
   if (state.game.phase !== 'active') reasons.push('Match not active');
   if (unit.requiresBuilding && you.buildings[unit.requiresBuilding] <= 0) reasons.push(`Needs ${state.meta.buildings[unit.requiresBuilding]?.name || unit.requiresBuilding.replace(/_/g, ' ')}`);
-  if (unit.requiresTech && !you.research.completed.includes(unit.requiresTech)) reasons.push(`Needs ${techLabel(unit.requiresTech)}`);
+  if (unit.requiresTech && !hasTechOnline(unit.requiresTech)) reasons.push(`Needs ${techLabel(unit.requiresTech)}`);
   const missing = getMissingCost(unit.cost, amount);
   if (missing.length) reasons.push(`Missing ${missing.join(', ')}`);
   return { disabled: reasons.length > 0, reasons };
@@ -573,10 +714,11 @@ function getResearchCardState(id) {
   const reasons = [];
   const isCurrent = you.research.active?.id === id;
   if (state.game.phase !== 'active') reasons.push('Match not active');
+  if (state.game.year < (you.researchLockUntil || -1)) reasons.push(`Research locked until Year ${you.researchLockUntil}`);
   if (you.research.completed.includes(id)) reasons.push('Completed');
   if (you.research.active && !isCurrent) reasons.push('Research in progress');
   if (tech.minYear && state.game.year < tech.minYear) reasons.push(`Available Year ${tech.minYear}`);
-  if (tech.prereq && !you.research.completed.includes(tech.prereq)) reasons.push(`Needs ${techLabel(tech.prereq)}`);
+  if (tech.prereq && !hasTechOnline(tech.prereq)) reasons.push(`Needs ${techLabel(tech.prereq)}`);
   const missing = getMissingCost(tech.cost);
   if (missing.length && !isCurrent) reasons.push(`Missing ${missing.join(', ')}`);
   return { disabled: reasons.length > 0, reasons, isCurrent };
@@ -592,7 +734,7 @@ function getQuickActionState(type, missileId = state.selectedMissile) {
   }
   if (type === 'missile') {
     const missile = state.meta.units[missileId];
-    if (!you.research.completed.includes('missile_silo')) reasons.push('Needs Missile Silo research');
+    if (!hasTechOnline('missile_silo')) reasons.push('Missile Silo offline');
     if (!missile?.missile) reasons.push('Choose a missile type');
     if ((you.units[missileId] || 0) <= 0) reasons.push(`Need ${missile?.name || 'missile stock'}`);
   }
@@ -612,14 +754,14 @@ function renderReasons(reasons) {
 }
 
 function formatPendingAction(action) {
-  if (action.type === 'missile') return `${state.meta.units[action.missileId]?.name || 'Missile'} strike -> ${action.target}`;
-  if (action.type === 'scout') return 'Scout mission';
+  if (action.type === 'missile') return `${state.meta.units[action.missileId]?.name || 'Missile'} strike -> ${getTargetLabel(action.targetBucket)}`;
+  if (action.type === 'scout') return `Scout -> ${getTargetLabel(action.targetBucket)}`;
   if (action.type === 'assault') {
     const forces = getAssaultUnits().map(([id]) => id)
-      .map((key) => action[key] ? `${emojis[key]}${action[key]}` : '')
+      .map((key) => action.committedUnits?.[key] ? `${emojis[key]}${action.committedUnits[key]}` : '')
       .filter(Boolean)
       .join(' ');
-    return `Assault ${forces || '(no forces)'}`;
+    return `${getTargetLabel(action.targetBucket)} assault ${forces || '(no forces)'}`;
   }
   return action.type;
 }
@@ -650,6 +792,8 @@ function renderDashboard() {
         <div class="small">Opponent: ${opponent}</div>
         <div class="small">💳 Credits: ${you.credits}</div>
         <div class="small">Phase: ${getPhaseLabel()}</div>
+        <div class="small">War Condition: ${getWarConditionLabel()}</div>
+        <div class="small">${getWarConditionDescription()}</div>
         <div class="small" id="dashboardSummary">${getDashboardSummary()}</div>
       </div>
       <div class="card">
@@ -688,11 +832,13 @@ function renderMilitary() {
   const you = state.game.you;
   const unitsHtml = getMilitaryUnits().map(([id, unit]) => {
     const unitState = getUnitCardState(id);
+    const attackAvailable = getAttackAvailableCount(id);
     return `<div class="card">
       <b>${emojis[id] || ''} ${unit.name}</b>
-      <div class="small">Owned: ${you.units[id]}</div>
+      <div class="small">Owned: ${you.units[id]}${unit.defenceAssignable ? ` | Free for assault: ${attackAvailable}` : ''}</div>
       <div class="small">Cost: ${costLine(unit.cost)}</div>
       <div class="small">${unit.missile ? 'Missile payload' : `Attack ${unit.attack || 0}${unit.defense ? ` | Defence ${unit.defense}` : ''}`}</div>
+      ${getCombatCapabilityLine(unit) ? `<div class="small">${getCombatCapabilityLine(unit)}</div>` : ''}
       ${renderReasons(unitState.reasons)}
       <div class="row stepper">
         ${actionBtn('-', () => adjustUnitDraft(id, -1))}
@@ -720,6 +866,7 @@ function renderDefences() {
       <b>${emojis[id] || ''} ${building.name}</b>
       <div class="small">Owned: ${you.buildings[id]} | Build time: ${building.buildTime} months</div>
       <div class="small">Cost: ${costLine(building.cost)}</div>
+      ${getCombatCapabilityLine(building) ? `<div class="small">${getCombatCapabilityLine(building)}</div>` : ''}
       ${productionLine(building) ? `<div class="small">Output: ${productionLine(building)}</div>` : ''}
       ${renderReasons(cardState.reasons)}
       ${actionBtn(label, () => sendAction('build', { id }), { disabled: cardState.disabled, title: cardState.reasons.join(' | ') })}
@@ -733,6 +880,7 @@ function renderDefences() {
       <div class="small">Owned: ${you.units[id]}</div>
       <div class="small">Cost: ${costLine(unit.cost)}</div>
       <div class="small">Defence ${unit.defense || 0}</div>
+      ${getCombatCapabilityLine(unit) ? `<div class="small">${getCombatCapabilityLine(unit)}</div>` : ''}
       ${renderReasons(unitState.reasons)}
       <div class="row stepper">
         ${actionBtn('-', () => adjustUnitDraft(id, -1))}
@@ -795,13 +943,88 @@ function renderTrade() {
   bindTradeControls();
 }
 
+function renderTargetOptions(selected) {
+  return getTargetBuckets().map(([bucket, config]) => `<option value="${bucket}" ${selected === bucket ? 'selected' : ''}>${config.label}</option>`).join('');
+}
+
+function adjustDefenceAssignment(bucket, id, delta) {
+  const currentAssignments = { ...getBucketAssignments(bucket) };
+  const current = currentAssignments[id] || 0;
+  const max = current + getDefenceAssignableAvailableCount(id, bucket);
+  const next = Math.max(0, Math.min(current + delta, max));
+  if (next === current) return;
+  currentAssignments[id] = next;
+  sendAction('set_defence_assignment', { bucket, assignments: currentAssignments });
+}
+
+function renderDefenceAssignmentRows(bucket, entries) {
+  return entries.map(([id, entity]) => {
+    const assigned = getBucketAssignments(bucket)[id] || 0;
+    const available = getDefenceAssignableAvailableCount(id, bucket);
+    return `<div class="row stepper assignment-row">
+      <span class="assignment-icon">${emojis[id] || ''}</span>
+      ${actionBtn('-', () => adjustDefenceAssignment(bucket, id, -1), { disabled: assigned <= 0, title: assigned <= 0 ? 'Nothing assigned' : '' })}
+      <input type="number" value="${assigned}" min="0" readonly />
+      ${actionBtn('+', () => adjustDefenceAssignment(bucket, id, 1), { disabled: available <= 0, title: available <= 0 ? 'No free stock left' : '' })}
+      <span class="small">${entity.name} | Free ${available}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderDefenceRoom() {
+  const buildingEntries = getDefenceAssignableBuildings();
+  const unitEntries = getDefenceAssignableUnits();
+  tabContent.innerHTML = `
+    <h3>Defence Room</h3>
+    <div class="small">Assign military and defence assets into Economy, Buildings, or Research Center. Assigned military stock is reserved from assaults until you move it.</div>
+    <div class="defence-room-grid">
+      ${getTargetBuckets().map(([bucket, config]) => `
+        <div class="panel inset">
+          <h3>${getTargetIcon(bucket)} ${config.label}</h3>
+          <div class="small">Only assets assigned here will fight when this bucket is attacked.</div>
+          <div class="assignment-group">
+            <div class="small">Defence structures</div>
+            ${renderDefenceAssignmentRows(bucket, buildingEntries)}
+          </div>
+          <div class="assignment-group">
+            <div class="small">Combat units</div>
+            ${renderDefenceAssignmentRows(bucket, unitEntries)}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderOpponentIntel() {
+  const logs = state.game?.you?.opponentIntelLog || [];
+  const forcedView = getForcedViewLock();
+  tabContent.innerHTML = `
+    <h3>Opponent Intel</h3>
+    <div class="small">${forcedView ? `Window locked for ${getForcedViewSeconds()}s while you review the attack report.` : 'Scout reports and war reports stay here for the whole match.'}</div>
+    <div class="intel-log">
+      ${logs.length ? logs.map((entry) => `
+        <div class="intel-entry ${entry.tone || ''}">
+          <div class="intel-head">
+            <b>${getTargetIcon(entry.bucket)} ${entry.title}</b>
+            <span class="small">Y${entry.year}</span>
+          </div>
+          ${entry.summary ? `<div class="small">${entry.summary}</div>` : ''}
+          ${entry.details?.length ? `<ul>${entry.details.map((detail) => `<li>${detail}</li>`).join('')}</ul>` : ''}
+        </div>
+      `).join('') : '<div class="small">No intel reports yet.</div>'}
+    </div>
+  `;
+}
+
 function renderSidebar() {
   const you = state.game.you;
   const resourceRows = state.meta.resources.map((resource) => {
     const value = Math.floor(you.resources[resource]);
     const net = you.net?.[resource] ?? 0;
     const cls = getResourceStateClass(value, net);
-    return `<tr class="${cls}"><td>${emojis[resource] || ''} ${resource}</td><td>${value}</td><td>${formatDelta(net)}</td></tr>`;
+    const tooltip = escapeAttr(getResourceConsumptionTooltip(resource));
+    return `<tr class="${cls}" title="${tooltip}"><td title="${tooltip}">${emojis[resource] || ''} ${resource}</td><td>${value}</td><td>${formatDelta(net)}</td></tr>`;
   }).join('');
 
   const buildingRows = Object.entries(state.meta.buildings).map(([id, building]) => `
@@ -824,6 +1047,8 @@ function renderSidebar() {
     <div class="small">👥 Population ${you.population}/${you.populationMax}</div>
     <div class="small">💳 Credits ${you.credits}</div>
     <div class="small">🎯 ${getPhaseLabel()}</div>
+    <div class="small">⚠️ ${getWarConditionLabel()}</div>
+    <div class="small">${getWarConditionDescription()}</div>
     <div class="split-panels">
       <div class="panel inset">
         <h3>Resources</h3>
@@ -833,7 +1058,7 @@ function renderSidebar() {
         </table>
       </div>
       <div class="panel inset">
-        <h3>Supports</h3>
+        <h3>Buildings</h3>
         <table class="data-table">
           <thead><tr><th>Item</th><th>Category</th><th>Owned</th></tr></thead>
           <tbody>${buildingRows}</tbody>
@@ -859,6 +1084,14 @@ function renderSidebar() {
 
 function refreshLiveCountdowns() {
   if (!state.game) return;
+  const lockActive = Boolean(getForcedViewLock());
+
+  if (lockActive !== state.lockUiActive) {
+    state.lockUiActive = lockActive;
+    renderStatusBanner();
+    drawTabs();
+    if (state.tab === 'opponent_intel') renderTab();
+  }
 
   const sidebarCountdownEl = document.getElementById('sidebarCountdown');
   if (sidebarCountdownEl) sidebarCountdownEl.textContent = `⏱️ ${getSidebarCountdownLabel()}`;
@@ -868,6 +1101,9 @@ function refreshLiveCountdowns() {
 
   const statusCountdownEl = document.getElementById('statusCountdown');
   if (statusCountdownEl) statusCountdownEl.textContent = getStatusCountdownMessage();
+
+  const forcedViewCountdownEl = document.getElementById('forcedViewCountdown');
+  if (forcedViewCountdownEl && lockActive) forcedViewCountdownEl.textContent = `Opponent Intel locked for ${getForcedViewSeconds()}s.`;
 
   if (state.tab === 'trade') {
     const ordersById = Object.fromEntries((state.game.you.tradeOrders || []).map((order) => [order.id, order]));
@@ -882,15 +1118,18 @@ function renderResearch() {
   const you = state.game.you;
   tabContent.innerHTML = `<h3>Research</h3>
     <div class="small">Active: ${you.research.active ? `${state.meta.research[you.research.active.id].name} (${ticksToMonths(you.research.active.ticksRemaining)} months left)` : 'None'}</div>
+    <div class="small">${state.game.year < (you.researchLockUntil || -1) ? `Research Center disrupted until Year ${you.researchLockUntil}.` : 'Research Center online.'}</div>
     <div class="action-grid">` +
     Object.entries(state.meta.research).map(([id, tech]) => {
       const cardState = getResearchCardState(id);
       const progress = cardState.isCurrent ? Math.max(0, 100 - Math.floor((you.research.active.ticksRemaining / (tech.years * (state.meta?.ticksPerMonth || 5))) * 100)) : (you.research.completed.includes(id) ? 100 : 0);
+      const disabledUntil = you.research.disabledUntil?.[id];
       const label = cardState.isCurrent ? `Researching... ${progress}%` : 'Start';
       return `<div class="card">
         <b>${tech.name}</b>
         <div class="small">Cost: ${costLine(tech.cost)} | 🕒 ${tech.years} months</div>
         <div class="small">Progress: ${progress}%</div>
+        ${disabledUntil > state.game.year ? `<div class="small warning">Disabled until Year ${disabledUntil}</div>` : ''}
         <div class="progress"><span style="width:${progress}%"></span></div>
         ${renderReasons(cardState.reasons)}
         ${actionBtn(label, () => sendAction('research', { id }), { disabled: cardState.disabled, title: cardState.reasons.join(' | ') })}
@@ -903,38 +1142,64 @@ function renderWarRoom() {
   const missileState = getQuickActionState('missile', state.selectedMissile);
   const assaultRows = getAssaultUnits().map(([id, unit]) => {
     updateWarRoomDraft(id, state.warRoomDraft[id] || 0);
-    return `<div class="row stepper">${emojis[id] || ''}${actionBtn('-', () => adjustWarRoomDraft(id, -1))}<input id="wr_${id}" type="number" value="${state.warRoomDraft[id]}" min="0" readonly />${actionBtn('+', () => adjustWarRoomDraft(id, 1))}<span class="small">${unit.name}</span></div>`;
+    const freeCount = getAttackAvailableCount(id);
+    return `<div class="row stepper">${emojis[id] || ''}${actionBtn('-', () => adjustWarRoomDraft(id, -1), { disabled: (state.warRoomDraft[id] || 0) <= 0 })}<input id="wr_${id}" type="number" value="${state.warRoomDraft[id]}" min="0" readonly />${actionBtn('+', () => adjustWarRoomDraft(id, 1), { disabled: freeCount <= (state.warRoomDraft[id] || 0), title: freeCount <= (state.warRoomDraft[id] || 0) ? 'No more free stock' : '' })}<span class="small">${unit.name} | Free ${freeCount}</span></div>`;
   }).join('');
+  const assaultPayload = Object.fromEntries(getAssaultUnits().map(([id]) => [id, state.warRoomDraft[id] || 0]).filter(([, count]) => count > 0));
   tabContent.innerHTML = `<h3>War Room</h3>
+    <div class="panel inset">
+      <h3>War Condition</h3>
+      <div class="small">${getWarConditionLabel()}</div>
+      <div class="small">${getWarConditionDescription()}</div>
+    </div>
     <p>Queue actions now. All attacks resolve when the current year ends.</p>
     ${renderPendingActions()}
     <div class="card">
       ${renderReasons(scoutState.reasons)}
-      <div class="row">${actionBtn('Launch Scout', () => sendAction('scout', {}), { disabled: scoutState.disabled, title: scoutState.reasons.join(' | ') })}</div>
+      <div class="row">
+        <select id="wrScoutTarget">${renderTargetOptions(state.selectedScoutTarget)}</select>
+        ${actionBtn('Launch Scout', () => {
+          state.selectedScoutTarget = document.getElementById('wrScoutTarget').value;
+          sendAction('scout', { targetBucket: state.selectedScoutTarget });
+        }, { disabled: scoutState.disabled, title: scoutState.reasons.join(' | ') })}
+      </div>
       ${renderReasons(missileState.reasons)}
       <div class="row">
         <select id="wrMissile">
           ${getMilitaryUnits().filter(([, unit]) => unit.missile).map(([id, unit]) => `<option value="${id}" ${state.selectedMissile === id ? 'selected' : ''}>${unit.name}</option>`).join('')}
         </select>
-        <select id="wrTarget">
-          <option value="economy">Economy</option>
-          <option value="military">Military</option>
-          <option value="support">Supports</option>
-        </select>
+        <select id="wrMissileTarget">${renderTargetOptions(state.selectedMissileTarget)}</select>
         ${actionBtn('Launch Missile', () => {
           state.selectedMissile = document.getElementById('wrMissile').value;
-          sendAction('missile', { missileId: state.selectedMissile, target: document.getElementById('wrTarget').value });
+          state.selectedMissileTarget = document.getElementById('wrMissileTarget').value;
+          sendAction('missile', { missileId: state.selectedMissile, targetBucket: state.selectedMissileTarget });
         }, { disabled: missileState.disabled, title: missileState.reasons.join(' | ') })}
+      </div>
+      <div class="row">
+        <select id="wrAssaultTarget">${renderTargetOptions(state.selectedAssaultTarget)}</select>
+        <span class="small">Choose the bucket once, then commit assault.</span>
       </div>
       <div class="war-room-grid" title="Commit assault units">
         ${assaultRows}
-        ${actionBtn('Commit Assault', () => sendAction('assault', Object.fromEntries(getAssaultUnits().map(([id]) => [id, state.warRoomDraft[id] || 0]))), { disabled: state.game.phase !== 'active', title: state.game.phase !== 'active' ? 'Match not active' : '' })}
+        ${actionBtn('Commit Assault', () => {
+          state.selectedAssaultTarget = document.getElementById('wrAssaultTarget').value;
+          sendAction('assault', { targetBucket: state.selectedAssaultTarget, committedUnits: assaultPayload });
+        }, { disabled: state.game.phase !== 'active' || !Object.keys(assaultPayload).length, title: state.game.phase !== 'active' ? 'Match not active' : (!Object.keys(assaultPayload).length ? 'Choose at least one unit' : '') })}
       </div>
     </div>`;
   document.getElementById('wrMissile')?.addEventListener('change', (event) => {
     state.selectedMissile = event.target.value;
     state.forceTabRefresh = true;
     renderAll();
+  });
+  document.getElementById('wrScoutTarget')?.addEventListener('change', (event) => {
+    state.selectedScoutTarget = event.target.value;
+  });
+  document.getElementById('wrMissileTarget')?.addEventListener('change', (event) => {
+    state.selectedMissileTarget = event.target.value;
+  });
+  document.getElementById('wrAssaultTarget')?.addEventListener('change', (event) => {
+    state.selectedAssaultTarget = event.target.value;
   });
 }
 
@@ -947,6 +1212,8 @@ function renderTab() {
   if (state.tab === 'defences') return renderDefences();
   if (state.tab === 'research') return renderResearch();
   if (state.tab === 'war_room') return renderWarRoom();
+  if (state.tab === 'defence_room') return renderDefenceRoom();
+  if (state.tab === 'opponent_intel') return renderOpponentIntel();
 }
 
 async function sendAction(type, payload) {
@@ -960,9 +1227,14 @@ async function sendAction(type, payload) {
 }
 
 function drawTabs() {
-  tabsEl.innerHTML = tabs.map((tab) => `<button class="tab ${state.tab === tab ? 'active' : ''}" data-tab="${tab}">${tabLabels[tab] || tab.replace('_', ' ')}</button>`).join('');
+  const forcedView = getForcedViewLock();
+  tabsEl.innerHTML = tabs.map((tab) => `<button class="tab ${state.tab === tab ? 'active' : ''}" data-tab="${tab}" ${forcedView && tab !== 'opponent_intel' ? 'disabled' : ''}>${tabLabels[tab] || tab.replace('_', ' ')}</button>`).join('');
   tabsEl.querySelectorAll('button').forEach((button) => {
     button.addEventListener('click', () => {
+      if (getForcedViewLock() && button.dataset.tab !== 'opponent_intel') {
+        setNotice(`Opponent Intel locked for ${getForcedViewSeconds()}s.`, 'warn');
+        return;
+      }
       state.tab = button.dataset.tab;
       state.lastTabSignature = null;
       state.forceTabRefresh = true;
@@ -992,6 +1264,11 @@ function renderAll() {
 function applyGameState(game) {
   state.game = game;
   state.lastStateAt = Date.now();
+  if (getForcedViewLock()) {
+    state.tab = 'opponent_intel';
+    state.lastTabSignature = null;
+    state.forceTabRefresh = true;
+  }
   if (game?.you?.name) nameEl.value = game.you.name;
   if (state.game?.phase === 'finished') {
     clearSession();

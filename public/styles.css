@@ -321,6 +321,72 @@ button:disabled {
   gap: 0.75rem;
 }
 
+.defence-room-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.assignment-group {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.assignment-group + .assignment-group {
+  margin-top: 1rem;
+}
+
+.assignment-row {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.assignment-icon {
+  width: 1rem;
+  text-align: center;
+}
+
+.intel-log {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.intel-entry {
+  background: #1c1f24;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.9rem;
+}
+
+.intel-entry.error {
+  border-color: rgba(255, 82, 82, 0.35);
+}
+
+.intel-entry.warn {
+  border-color: rgba(255, 171, 64, 0.35);
+}
+
+.intel-entry.info {
+  border-color: rgba(0, 229, 255, 0.18);
+}
+
+.intel-entry ul {
+  margin: 0.65rem 0 0;
+  padding-left: 1rem;
+  color: var(--text-dim);
+  display: grid;
+  gap: 0.3rem;
+}
+
+.intel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 0.35rem;
+}
+
 .hidden { display: none !important; }
 
 #roomInfo {
