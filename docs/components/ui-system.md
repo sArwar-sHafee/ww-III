@@ -12,11 +12,12 @@ Render the text-only UI from server state and submit player actions.
 - Dashboard
 - Economy
 - Trade
-- Supports
+- Constructions
 - Military
 - Defences
 - Research
 - War Room
+- Management
 
 ## Rules
 - Credits are always visible in the UI.
@@ -24,5 +25,5 @@ Render the text-only UI from server state and submit player actions.
 - Manual trade orders settle after 3 months instead of resolving instantly.
 - Trade amounts support sliders and numeric entry, with limits derived from current stock, credits, and storage.
 - Auto trade can buy or sell a configured amount once per year until cancelled.
-- Supports is the renamed structure-management tab.
+- Constructions is the renamed structure-management tab.
 - War Room uses dynamic assault and missile selections driven by unit metadata.

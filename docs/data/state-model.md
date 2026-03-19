@@ -38,7 +38,7 @@
 - `infantry`, `special_force`, `tank`, `war_ship`, `submarine`
 - `fighter_zed`, `attack_helicopter`, `combat_drone`
 - `ballistic_missile`, `cruise_missile`, `scout_drone`
-- `anti_tank_squad`, `naval_strike_missile`, `air_defence_gun`
+- `anti_tank_squad`, `naval_strike_missile`, `air_defence_gun`, `border_guard`
 
 ## Research IDs
 `basic_tools`, `electricity`, `guided_missiles`, `missile_silo`, `industrial_furnaces`, `advanced_mining`, `tanks`, `advanced_scouting`, `polymer`, `industrial_materials`, `naval_warfare`, `aerial_warfare`, `nuclear_technology`

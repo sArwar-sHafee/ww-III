@@ -39,19 +39,19 @@ const emojis = {
   farm: '🌾', lumber_camp: '🪓', steel_mill: '🏭', copper_mine: '🥉', alloy_quarry: '⛏️', oil_rig: '🛢️', magnet_extractor: '🧲', power_plant: '⚡', glassworks: '🪟', polymer_plant: '🧪', concrete_plant: '🧱', silicon_refinery: '🖥️', uranium_mine: '☢️',
   shelter: '🏠', barracks: '🏕️', factory: '🏭', radar_station: '📡', dry_dock: '⚓', airfield: '🛫',
   anti_missile_battery: '🛡️', land_mine: '💣',
-  infantry: '🪖', special_force: '🎖️', tank: '🛞', war_ship: '🚢', submarine: '🚤', fighter_zed: '🛩️', attack_helicopter: '🚁', combat_drone: '🤖', ballistic_missile: '🚀', cruise_missile: '☄️', scout_drone: '📡', anti_tank_squad: '🧨', naval_strike_missile: '🚀', air_defence_gun: '🎯'
+  infantry: '🪖', special_force: '🎖️', tank: '🛞', war_ship: '🚢', submarine: '🚤', fighter_zed: '🛩️', attack_helicopter: '🚁', combat_drone: '🤖', ballistic_missile: '🚀', cruise_missile: '☄️', scout_drone: '🛰️', anti_tank_squad: '🧨', naval_strike_missile: '🚀', air_defence_gun: '🎯', border_guard: '🛂'
 };
 const tabs = ['dashboard', 'economy', 'trade', 'supports', 'military', 'defences', 'research', 'war_room', 'defence_room', 'opponent_intel'];
 const tabLabels = {
   dashboard: 'Dashboard',
   economy: 'Economy',
   trade: 'Trade',
-  supports: 'Supports',
+  supports: 'Constructions',
   military: 'Military',
   defences: 'Defences',
   research: 'Research',
   war_room: 'War Room',
-  defence_room: 'Defence Room',
+  defence_room: 'Management',
   opponent_intel: 'Opponent Intel'
 };
 
@@ -429,15 +429,36 @@ function formatCombatProfile(entries = []) {
   return entries.map(([target, value]) => `${emojis[target] || ''} x ${formatAmount(value)}`).join(' | ');
 }
 
+function formatDestroyedBy(entries = []) {
+  return entries.map(([source, value]) => `${emojis[source] || ''} : ${formatAmount(value)}`).join(' | ');
+}
+
 function formatMissileIntercept(entries = []) {
   return entries.map(([target, value]) => `${emojis[target] || ''} x ${formatAmount(value)}`).join(' | ');
 }
 
-function getCombatCapabilityLine(entity) {
+function getCombatCapabilityLine(entity, label = 'Can destroy') {
   const lines = [];
-  if (entity?.combatProfile?.length) lines.push(formatCombatProfile(entity.combatProfile));
+  if (entity?.combatProfile?.length) lines.push(`${label} ${formatCombatProfile(entity.combatProfile)}`);
   if (entity?.missileIntercept?.length) lines.push(`Missile shield ${formatMissileIntercept(entity.missileIntercept)}`);
   return lines.join(' | ');
+}
+
+function getDestroyedByLine(unitId) {
+  const sources = [];
+  for (const [id, unit] of Object.entries(state.meta?.units || {})) {
+    if (unit.section !== 'defence' || !unit.combatProfile?.length) continue;
+    for (const [targetId, value] of unit.combatProfile) {
+      if (targetId === unitId) sources.push([id, value]);
+    }
+  }
+  for (const [id, building] of Object.entries(state.meta?.buildings || {})) {
+    if (!building.defenceAssignable || !building.combatProfile?.length) continue;
+    for (const [targetId, value] of building.combatProfile) {
+      if (targetId === unitId) sources.push([id, value]);
+    }
+  }
+  return sources.length ? `Destroyed by ${formatDestroyedBy(sources)}` : '';
 }
 
 function getResourceConsumptionTooltip(resource) {
@@ -702,7 +723,6 @@ function costLine(cost) {
 function productionLine(building) {
   const entries = [];
   for (const [key, value] of Object.entries(building.production || {})) entries.push(`${emojis[key] || ''}${key}: ${value}/year`);
-  for (const [key, value] of Object.entries(building.upkeep || {})) entries.push(`${emojis[key] || ''}${key}: -${value}/year`);
   return entries.join(', ');
 }
 
@@ -721,6 +741,12 @@ function getMissingCost(cost, amount = 1) {
   return Object.entries(cost)
     .filter(([key, value]) => (resources[key] ?? 0) < value * amount)
     .map(([key, value]) => `${key} ${value * amount}`);
+}
+
+function upkeepLine(entity) {
+  if (!entity?.upkeep) return '';
+  const entries = Object.entries(entity.upkeep).map(([key, value]) => `${emojis[key] || ''}${key}: -${value}/year`);
+  return entries.length ? `Upkeep: ${entries.join(', ')}` : '';
 }
 
 function getBuildCardState(id) {
@@ -777,6 +803,9 @@ function getQuickActionState(type, missileId = state.selectedMissile) {
     if (!hasTechOnline('missile_silo')) reasons.push('Missile Silo offline');
     if (!missile?.missile) reasons.push('Choose a missile type');
     if ((you.units[missileId] || 0) <= 0) reasons.push(`Need ${missile?.name || 'missile stock'}`);
+  }
+  if (type === 'nuclear') {
+    if (!hasTechOnline('nuclear_technology')) reasons.push('Nuclear Technology offline');
   }
   return { disabled: reasons.length > 0, reasons };
 }
@@ -855,7 +884,7 @@ function renderEconomyOrSupports() {
   const ids = Object.keys(state.meta.buildings).filter((id) => state.tab === 'economy'
     ? state.meta.buildings[id].category === 'economy'
     : state.meta.buildings[id].category === 'support');
-  tabContent.innerHTML = `<h3>${state.tab === 'economy' ? 'Economy' : 'Supports'}</h3><div class="action-grid">` + ids.map((id) => {
+  tabContent.innerHTML = `<h3>${state.tab === 'economy' ? 'Economy' : 'Constructions'}</h3><div class="action-grid">` + ids.map((id) => {
     const building = state.meta.buildings[id];
     const cardState = getBuildCardState(id);
     const label = cardState.inQueue ? `Building... (${ticksToMonths(cardState.inQueue.ticksRemaining)} months)` : 'Build';
@@ -863,6 +892,7 @@ function renderEconomyOrSupports() {
       <b>${emojis[id] || ''} ${building.name}</b>
       <div class="small">Owned: ${you.buildings[id]} | Build time: ${building.buildTime} months</div>
       <div class="small">Cost: ${costLine(building.cost)}</div>
+      ${upkeepLine(building) ? `<div class="small">${upkeepLine(building)}</div>` : ''}
       ${productionLine(building) ? `<div class="small">Output: ${productionLine(building)}</div>` : ''}
       ${renderReasons(cardState.reasons)}
       ${actionBtn(label, () => sendAction('build', { id }), { disabled: cardState.disabled, title: cardState.reasons.join(' | ') })}
@@ -875,12 +905,14 @@ function renderMilitary() {
   const unitsHtml = getMilitaryUnits().map(([id, unit]) => {
     const unitState = getUnitCardState(id);
     const attackAvailable = getAttackAvailableCount(id);
+    const destroyedBy = getDestroyedByLine(id);
     return `<div class="card">
       <b>${emojis[id] || ''} ${unit.name}</b>
-      <div class="small">Owned: ${you.units[id]}${unit.defenceAssignable ? ` | Free for assault: ${attackAvailable}` : ''}</div>
+      <div class="small">Owned: ${you.units[id]}${unit.assault ? ` | Free for assault: ${attackAvailable}` : ''}</div>
       <div class="small">Cost: ${costLine(unit.cost)}</div>
-      <div class="small">${unit.missile ? 'Missile payload' : `Attack ${unit.attack || 0}${unit.defense ? ` | Defence ${unit.defense}` : ''}`}</div>
-      ${getCombatCapabilityLine(unit) ? `<div class="small">${getCombatCapabilityLine(unit)}</div>` : ''}
+      ${upkeepLine(unit) ? `<div class="small">${upkeepLine(unit)}</div>` : ''}
+      ${unit.missile ? `<div class="small">Missile payload</div>` : ''}
+      ${destroyedBy ? `<div class="small">${destroyedBy}</div>` : ''}
       ${renderReasons(unitState.reasons)}
       <div class="row stepper">
         ${actionBtn('-', () => adjustUnitDraft(id, -1))}
@@ -908,7 +940,8 @@ function renderDefences() {
       <b>${emojis[id] || ''} ${building.name}</b>
       <div class="small">Owned: ${you.buildings[id]} | Build time: ${building.buildTime} months</div>
       <div class="small">Cost: ${costLine(building.cost)}</div>
-      ${getCombatCapabilityLine(building) ? `<div class="small">${getCombatCapabilityLine(building)}</div>` : ''}
+      ${upkeepLine(building) ? `<div class="small">${upkeepLine(building)}</div>` : ''}
+      ${getCombatCapabilityLine(building, 'Can destroy') ? `<div class="small">${getCombatCapabilityLine(building, 'Can destroy')}</div>` : ''}
       ${productionLine(building) ? `<div class="small">Output: ${productionLine(building)}</div>` : ''}
       ${renderReasons(cardState.reasons)}
       ${actionBtn(label, () => sendAction('build', { id }), { disabled: cardState.disabled, title: cardState.reasons.join(' | ') })}
@@ -921,8 +954,8 @@ function renderDefences() {
       <b>${emojis[id] || ''} ${unit.name}</b>
       <div class="small">Owned: ${you.units[id]}</div>
       <div class="small">Cost: ${costLine(unit.cost)}</div>
-      <div class="small">Defence ${unit.defense || 0}</div>
-      ${getCombatCapabilityLine(unit) ? `<div class="small">${getCombatCapabilityLine(unit)}</div>` : ''}
+      ${upkeepLine(unit) ? `<div class="small">${upkeepLine(unit)}</div>` : ''}
+      ${getCombatCapabilityLine(unit, 'Can destroy') ? `<div class="small">${getCombatCapabilityLine(unit, 'Can destroy')}</div>` : ''}
       ${renderReasons(unitState.reasons)}
       <div class="row stepper">
         ${actionBtn('-', () => adjustUnitDraft(id, -1))}
@@ -1021,8 +1054,8 @@ function renderDefenceRoom() {
   const buildingEntries = getDefenceAssignableBuildings();
   const unitEntries = getDefenceAssignableUnits();
   tabContent.innerHTML = `
-    <h3>Defence Room</h3>
-    <div class="small">Assign military and defence assets into Economy, Buildings, or Research Center. Assigned military stock is reserved from assaults until you move it.</div>
+    <h3>Management</h3>
+    <div class="small">Assign defence assets into Economy, Buildings, or Research Center. Only assigned defences will respond to attacks on that bucket.</div>
     <div class="defence-room-grid">
       ${getTargetBuckets().map(([bucket, config]) => `
         <div class="panel inset">
@@ -1033,7 +1066,7 @@ function renderDefenceRoom() {
             ${renderDefenceAssignmentRows(bucket, buildingEntries)}
           </div>
           <div class="assignment-group">
-            <div class="small">Combat units</div>
+            <div class="small">Defence units</div>
             ${renderDefenceAssignmentRows(bucket, unitEntries)}
           </div>
         </div>
@@ -1073,7 +1106,9 @@ function renderSidebar() {
     return `<tr class="${cls}" title="${tooltip}"><td title="${tooltip}">${emojis[resource] || ''} ${resource}</td><td>${value}</td><td>${formatDelta(net)}</td></tr>`;
   }).join('');
 
-  const buildingRows = Object.entries(state.meta.buildings).map(([id, building]) => `
+  const buildingRows = Object.entries(state.meta.buildings)
+    .filter(([, building]) => building.category !== 'military')
+    .map(([id, building]) => `
     <tr><td>${emojis[id] || ''} ${building.name}</td><td>${building.category}</td><td>${you.buildings[id]}</td></tr>
   `).join('');
 
@@ -1082,7 +1117,9 @@ function renderSidebar() {
     ...getDefenceUnits().map(([id, unit]) => `<tr><td>${emojis[id] || ''} ${unit.name}</td><td>${you.units[id]}</td></tr>`)
   ].join('');
 
-  const unitRows = Object.entries(state.meta.units).map(([id, unit]) => `
+  const unitRows = Object.entries(state.meta.units)
+    .filter(([, unit]) => unit.section !== 'defence')
+    .map(([id, unit]) => `
     <tr><td>${emojis[id] || ''} ${unit.name}</td><td>${you.units[id]}</td></tr>
   `).join('');
 
@@ -1185,6 +1222,7 @@ function renderResearch() {
 function renderWarRoom() {
   const scoutState = getQuickActionState('scout');
   const missileState = getQuickActionState('missile', state.selectedMissile);
+  const nuclearState = getQuickActionState('nuclear');
   const assaultRows = getAssaultUnits().map(([id, unit]) => {
     updateWarRoomDraft(id, state.warRoomDraft[id] || 0);
     const freeCount = getAttackAvailableCount(id);
@@ -1216,6 +1254,13 @@ function renderWarRoom() {
           sendAction('missile', { missileId: state.selectedMissile, targetBucket: state.selectedMissileTarget });
         }, { disabled: missileState.disabled, title: missileState.reasons.join(' | ') })}
       </div>
+      ${renderReasons(nuclearState.reasons)}
+      <div class="row">
+        ${actionBtn('Launch Nuclear Missile', () => {
+          sendAction('nuclear_strike', {});
+        }, { disabled: nuclearState.disabled, title: nuclearState.reasons.join(' | ') })}
+      </div>
+      <div class="small"><b>Ground Assault</b></div>
       <div class="row">
         <select id="wrAssaultTarget">${renderTargetOptions(state.selectedAssaultTarget)}</select>
         <span class="small">Choose the bucket once, then commit assault.</span>

@@ -31,7 +31,7 @@
 - Silicon Refinery: 🖥️
 - Uranium Mine: ☢️
 - Shelter: 🏠
-- Barracks: 🏕️
+- Military Camp: 🏕️
 - Factory: 🏭
 - Radar Station: 📡
 - Dry Dock: ⚓
@@ -50,7 +50,8 @@
 - Combat Drone: 🤖
 - Ballistic Missile: 🚀
 - Cruise Missile: ☄️
-- Scout Drone: 📡
+- Scout Drone: 🛰️
 - Anti-Tank Squad: 🧨
 - Naval Strike Missile: 🚀
 - Air Defence Gun: 🎯
+- Border Guard: 🛂

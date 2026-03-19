@@ -13,14 +13,28 @@ const TICK_MS = 1000;
 const TICKS_PER_YEAR = 60;
 const TICKS_PER_MONTH = 5;
 const TRADE_FEE = 1;
-const STARTING_RESOURCES = { nutrition: 5000, lumber: 3000, steel: 3000, copper: 1800, alloy: 2000, oil: 2000, magnet: 1500, electricity: 2000, glass: 1500, polymer: 1500, concrete: 1500, silicon: 1500, uranium: 200 };
+const STARTING_RESOURCES = { nutrition: 200, lumber: 60, steel: 40, copper: 30, alloy: 0, oil: 0, magnet: 0, electricity: 0, glass: 0, polymer: 0, concrete: 0, silicon: 0, uranium: 0 };
 const RESOURCE_KEYS = Object.keys(STARTING_RESOURCES);
 const TRADE_DELAY_MONTHS = 3;
 const TRADE_DELAY_TICKS = TRADE_DELAY_MONTHS * TICKS_PER_MONTH;
-const TRADE_PRICES = Object.fromEntries(RESOURCE_KEYS.map((resource) => [resource, 1]));
-const STARTING_POPULATION = 100;
-const STARTING_POPULATION_MAX = 100;
-const STARTING_CREDITS = 500;
+const TRADE_PRICES = {
+  nutrition: 1,
+  lumber: 2,
+  steel: 3,
+  copper: 3,
+  alloy: 5,
+  oil: 4,
+  magnet: 6,
+  electricity: 2,
+  glass: 3,
+  polymer: 4,
+  concrete: 3,
+  silicon: 6,
+  uranium: 12
+};
+const STARTING_POPULATION = 10;
+const STARTING_POPULATION_MAX = 10;
+const STARTING_CREDITS = 0;
 const POPULATION_NUTRITION_PER_YEAR = 0.25;
 
 const BUILDINGS = {
@@ -38,12 +52,12 @@ const BUILDINGS = {
   silicon_refinery: { name: 'Silicon Refinery', cost: { steel: 20, alloy: 10, copper: 12, electricity: 5 }, buildTime: 3, capacity: { silicon: 80 }, production: { silicon: 1.5 }, requires: ['advanced_mining'], category: 'economy' },
   uranium_mine: { name: 'Uranium Mine', cost: { steel: 30, alloy: 20, concrete: 15, electricity: 5 }, buildTime: 3, capacity: { uranium: 60 }, production: { uranium: 0.8 }, requires: ['advanced_mining'], category: 'economy' },
   shelter: { name: 'Shelter', cost: { lumber: 20, steel: 10, concrete: 8 }, buildTime: 1, category: 'support' },
-  barracks: { name: 'Barracks', cost: { lumber: 25, steel: 20, concrete: 10 }, buildTime: 2, category: 'support' },
+  barracks: { name: 'Military Camp', cost: { lumber: 25, steel: 20, concrete: 10 }, buildTime: 2, category: 'support' },
   factory: { name: 'Factory', cost: { steel: 35, alloy: 20, oil: 10, copper: 15, concrete: 10 }, buildTime: 3, requires: ['electricity'], category: 'support' },
   radar_station: { name: 'Radar Station', cost: { steel: 20, alloy: 12, magnet: 10, copper: 12, glass: 8 }, buildTime: 2, requires: ['advanced_scouting'], category: 'support' },
   anti_missile_battery: {
     name: 'Anti-Missile Battery',
-    cost: { steel: 28, oil: 12, magnet: 10, copper: 10 },
+    cost: { steel: 45, oil: 20, magnet: 18, copper: 18 },
     buildTime: 2,
     requires: ['guided_missiles'],
     category: 'military',
@@ -54,13 +68,13 @@ const BUILDINGS = {
   },
   land_mine: {
     name: 'Land Mine',
-    cost: { lumber: 40, steel: 25, polymer: 8 },
+    cost: { lumber: 60, steel: 40, polymer: 16 },
     buildTime: 2,
     category: 'military',
     defenceAssignable: true,
     defense: 18,
     combatWeight: 18,
-    combatProfile: [['tank', 1], ['infantry', 4], ['special_force', 4], ['anti_tank_squad', 2], ['attack_helicopter', 0.2]]
+    combatProfile: [['tank', 1], ['infantry', 4], ['special_force', 4]]
   },
   dry_dock: { name: 'Dry Dock', cost: { lumber: 45, steel: 35, concrete: 25, polymer: 10 }, buildTime: 3, category: 'support' },
   airfield: { name: 'Airfield', cost: { steel: 55, alloy: 30, concrete: 40, glass: 15, copper: 18 }, buildTime: 3, category: 'support' }
@@ -77,8 +91,7 @@ const UNITS = {
     combatWeight: 10,
     requiresBuilding: 'barracks',
     assault: true,
-    defenceAssignable: true,
-    combatProfile: [['tank', 0.2], ['special_force', 1], ['infantry', 1], ['anti_tank_squad', 0.6], ['land_mine', 0.2], ['anti_missile_battery', 0.2]]
+    defenceAssignable: false
   },
   special_force: {
     name: 'Special Force',
@@ -91,8 +104,7 @@ const UNITS = {
     requiresTech: 'advanced_scouting',
     requiresBuilding: 'barracks',
     assault: true,
-    defenceAssignable: true,
-    combatProfile: [['tank', 0.3], ['special_force', 1], ['infantry', 2], ['anti_tank_squad', 1], ['land_mine', 0.5], ['anti_missile_battery', 0.4]]
+    defenceAssignable: false
   },
   tank: {
     name: 'Tank',
@@ -105,8 +117,7 @@ const UNITS = {
     requiresTech: 'tanks',
     requiresBuilding: 'barracks',
     assault: true,
-    defenceAssignable: true,
-    combatProfile: [['tank', 1], ['anti_tank_squad', 1], ['special_force', 5], ['infantry', 5], ['land_mine', 1], ['anti_missile_battery', 1]]
+    defenceAssignable: false
   },
   war_ship: {
     name: 'War Ship',
@@ -119,8 +130,7 @@ const UNITS = {
     requiresTech: 'naval_warfare',
     requiresBuilding: 'dry_dock',
     assault: true,
-    defenceAssignable: true,
-    combatProfile: [['war_ship', 1], ['submarine', 0.5], ['naval_strike_missile', 0.5], ['tank', 0.8], ['anti_missile_battery', 0.7], ['infantry', 3]]
+    defenceAssignable: false
   },
   submarine: {
     name: 'Submarine',
@@ -133,8 +143,7 @@ const UNITS = {
     requiresTech: 'naval_warfare',
     requiresBuilding: 'dry_dock',
     assault: true,
-    defenceAssignable: true,
-    combatProfile: [['war_ship', 1.2], ['submarine', 1], ['naval_strike_missile', 0.7], ['tank', 1], ['anti_missile_battery', 0.8]]
+    defenceAssignable: false
   },
   fighter_zed: {
     name: 'Fighter Zed',
@@ -147,8 +156,7 @@ const UNITS = {
     requiresTech: 'aerial_warfare',
     requiresBuilding: 'airfield',
     assault: true,
-    defenceAssignable: true,
-    combatProfile: [['fighter_zed', 1], ['attack_helicopter', 1.5], ['combat_drone', 4], ['scout_drone', 6], ['air_defence_gun', 0.4], ['war_ship', 0.4], ['tank', 0.4], ['infantry', 2]]
+    defenceAssignable: false
   },
   attack_helicopter: {
     name: 'Attack Helicopter',
@@ -161,8 +169,7 @@ const UNITS = {
     requiresTech: 'aerial_warfare',
     requiresBuilding: 'airfield',
     assault: true,
-    defenceAssignable: true,
-    combatProfile: [['tank', 1.2], ['anti_tank_squad', 1], ['infantry', 4], ['special_force', 4], ['air_defence_gun', 0.4], ['land_mine', 1], ['war_ship', 0.4]]
+    defenceAssignable: false
   },
   combat_drone: {
     name: 'Combat Drone',
@@ -175,8 +182,7 @@ const UNITS = {
     requiresTech: 'advanced_scouting',
     requiresBuilding: 'airfield',
     assault: true,
-    defenceAssignable: true,
-    combatProfile: [['infantry', 2], ['special_force', 2], ['tank', 0.3], ['combat_drone', 1], ['scout_drone', 2], ['fighter_zed', 0.4], ['attack_helicopter', 0.5], ['air_defence_gun', 0.25], ['anti_missile_battery', 0.2]]
+    defenceAssignable: false
   },
   ballistic_missile: {
     name: 'Ballistic Missile',
@@ -210,30 +216,30 @@ const UNITS = {
   anti_tank_squad: {
     name: 'Anti-Tank Squad',
     section: 'defence',
-    cost: { nutrition: 6, steel: 8, polymer: 2 },
+    cost: { nutrition: 10, steel: 12, polymer: 6 },
     upkeep: { nutrition: 0.15 },
     defense: 18,
     combatWeight: 18,
     requiresTech: 'tanks',
     requiresBuilding: 'barracks',
     defenceAssignable: true,
-    combatProfile: [['tank', 1.2], ['attack_helicopter', 0.2], ['infantry', 0.5], ['special_force', 0.5], ['land_mine', 0.3]]
+    combatProfile: [['tank', 1.2]]
   },
   naval_strike_missile: {
     name: 'Naval Strike Missile',
     section: 'defence',
-    cost: { steel: 18, alloy: 15, oil: 10, copper: 4 },
+    cost: { steel: 30, alloy: 24, oil: 16, copper: 8 },
     defense: 45,
     combatWeight: 45,
     requiresTech: 'guided_missiles',
     requiresBuilding: 'dry_dock',
     defenceAssignable: true,
-    combatProfile: [['war_ship', 1.5], ['submarine', 1], ['tank', 0.5], ['anti_missile_battery', 0.5]]
+    combatProfile: [['war_ship', 1.5], ['submarine', 1], ['tank', 0.5]]
   },
   air_defence_gun: {
     name: 'Air Defence Gun',
     section: 'defence',
-    cost: { steel: 16, alloy: 8, electricity: 6, copper: 6 },
+    cost: { steel: 26, alloy: 14, electricity: 10, copper: 10 },
     upkeep: { electricity: 0.08, copper: 0.05 },
     defense: 28,
     combatWeight: 28,
@@ -241,6 +247,17 @@ const UNITS = {
     requiresBuilding: 'airfield',
     defenceAssignable: true,
     combatProfile: [['fighter_zed', 1.2], ['attack_helicopter', 1.2], ['combat_drone', 4], ['scout_drone', 6]]
+  },
+  border_guard: {
+    name: 'Border Guard',
+    section: 'defence',
+    cost: { nutrition: 10, polymer: 6 },
+    upkeep: { nutrition: 0.15 },
+    defense: 12,
+    combatWeight: 12,
+    requiresBuilding: 'barracks',
+    defenceAssignable: true,
+    combatProfile: [['infantry', 1], ['special_force', 1], ['tank', 0.2]]
   }
 };
 
@@ -255,9 +272,9 @@ const RESEARCH = {
   naval_warfare: { name: 'Naval Warfare', cost: { alloy: 40, magnet: 20, concrete: 10 }, years: 4, prereq: 'basic_tools' },
   aerial_warfare: { name: 'Aerial Warfare', cost: { alloy: 50, silicon: 20, copper: 15, glass: 10 }, years: 4, prereq: 'electricity' },
   advanced_scouting: { name: 'Advanced Scouting', cost: { alloy: 25, magnet: 10, copper: 10, silicon: 8 }, years: 2, prereq: 'industrial_furnaces' },
-  polymer: { name: 'Polymer', cost: { alloy: 30, oil: 10, copper: 5 }, years: 3, prereq: 'electricity' },
+  polymer: { name: 'Polymer Research', cost: { alloy: 30, oil: 10, copper: 5 }, years: 3, prereq: 'electricity' },
   industrial_materials: { name: 'Industrial Materials', cost: { alloy: 20, steel: 5, electricity: 5, glass: 10, concrete: 10 }, years: 2, prereq: 'industrial_furnaces' },
-  nuclear_technology: { name: 'Nuclear Technology', cost: { alloy: 100, magnet: 50, electricity: 30, uranium: 20, copper: 15 }, years: 5, prereq: 'advanced_mining' }
+  nuclear_technology: { name: 'Nuclear Technology', cost: { alloy: 100, magnet: 50, electricity: 30, uranium: 20, copper: 15 }, years: 120, prereq: 'advanced_mining' }
 };
 
 const TARGET_BUCKETS = {
@@ -288,47 +305,48 @@ const RESEARCH_DISRUPTION_PRIORITY = [
 ];
 
 const STARTING_BUILDINGS = {
-  farm: 8,
-  lumber_camp: 6,
-  steel_mill: 6,
-  copper_mine: 4,
-  alloy_quarry: 5,
-  oil_rig: 4,
-  magnet_extractor: 4,
-  power_plant: 5,
-  glassworks: 3,
-  polymer_plant: 3,
-  concrete_plant: 3,
-  silicon_refinery: 3,
+  farm: 1,
+  lumber_camp: 1,
+  steel_mill: 1,
+  copper_mine: 1,
+  alloy_quarry: 0,
+  oil_rig: 0,
+  magnet_extractor: 0,
+  power_plant: 0,
+  glassworks: 0,
+  polymer_plant: 0,
+  concrete_plant: 0,
+  silicon_refinery: 0,
   uranium_mine: 0,
-  shelter: 10,
-  barracks: 3,
-  factory: 2,
-  radar_station: 2,
-  anti_missile_battery: 1,
-  land_mine: 1,
-  dry_dock: 1,
-  airfield: 1
+  shelter: 2,
+  barracks: 0,
+  factory: 0,
+  radar_station: 0,
+  anti_missile_battery: 0,
+  land_mine: 0,
+  dry_dock: 0,
+  airfield: 0
 };
 
 const STARTING_UNITS = {
-  infantry: 50,
-  special_force: 20,
-  tank: 30,
-  war_ship: 20,
-  fighter_zed: 20,
-  attack_helicopter: 12,
-  combat_drone: 20,
-  ballistic_missile: 10,
-  cruise_missile: 12,
-  submarine: 8,
-  scout_drone: 20,
-  anti_tank_squad: 18,
-  naval_strike_missile: 10,
-  air_defence_gun: 12
+  infantry: 0,
+  special_force: 0,
+  tank: 0,
+  war_ship: 0,
+  fighter_zed: 0,
+  attack_helicopter: 0,
+  combat_drone: 0,
+  ballistic_missile: 0,
+  cruise_missile: 0,
+  submarine: 0,
+  scout_drone: 0,
+  anti_tank_squad: 0,
+  naval_strike_missile: 0,
+  air_defence_gun: 0,
+  border_guard: 0
 };
 
-const STARTING_RESEARCH = Object.keys(RESEARCH);
+const STARTING_RESEARCH = ['basic_tools'];
 
 const rooms = new Map();
 
@@ -676,11 +694,9 @@ function simulateCombat(attackerRoster, defenderRoster) {
 
   while (rounds < 6 && hasCombatants(attackers) && hasCombatants(defenders)) {
     rounds += 1;
-    const defenderKills = resolveCombatWave(attackers, defenders);
-    const attackerKills = resolveCombatWave(defenders, attackers);
-    const actualDefenderLosses = applyRosterLosses(defenders, defenderKills);
-    const actualAttackerLosses = applyRosterLosses(attackers, attackerKills);
-    if (!Object.keys(actualDefenderLosses).length && !Object.keys(actualAttackerLosses).length) break;
+    const defenderKills = resolveCombatWave(defenders, attackers);
+    const actualAttackerLosses = applyRosterLosses(attackers, defenderKills);
+    if (!Object.keys(actualAttackerLosses).length) break;
   }
 
   const attackerScore = getCombatScore(attackers);
@@ -692,7 +708,7 @@ function simulateCombat(attackerRoster, defenderRoster) {
     attackersRemaining: attackers,
     defendersRemaining: defenders,
     attackerLosses: getRosterLosses(attackerRoster, attackers),
-    defenderLosses: getRosterLosses(defenderRoster, defenders),
+    defenderLosses: {},
     attackerScore,
     defenderScore
   };
@@ -787,6 +803,13 @@ function applyBuildingsImpact(defender, { buildingLosses = 0, populationLoss = 0
 
 function applyResearchCenterImpact(room, defender, { delayMonths = 0, disableCount = 0, disableYears = 0 }) {
   const details = [];
+  const nuking = defender.research.active?.id === 'nuclear_technology';
+  if (nuking && (delayMonths > 0 || disableCount > 0 || disableYears > 0)) {
+    defender.research.active = null;
+    const disabledUntil = room.year + Math.max(1, disableYears || 1);
+    defender.research.disabledUntil.nuclear_technology = Math.max(getResearchDisableYear(defender, 'nuclear_technology'), disabledUntil);
+    details.push(`Nuclear Technology research halted until Year ${defender.research.disabledUntil.nuclear_technology}`);
+  }
 
   if (delayMonths > 0 && defender.research.active) {
     defender.research.active.ticksRemaining += delayMonths * TICKS_PER_MONTH;
@@ -810,6 +833,19 @@ function applyResearchCenterImpact(room, defender, { delayMonths = 0, disableCou
   }
 
   return details.length ? details : ['Research Center stayed online.'];
+}
+
+function resolveNuclearStrike(room, player, opponent) {
+  room.winner = player.playerId;
+  appendEvent(player, room.year, '☢️ Nuclear missile launched. Victory secured.');
+  appendEvent(opponent, room.year, '☢️ Nuclear missile impact confirmed. See Opponent Intel.', 'error');
+  appendIntel(opponent, room.year, {
+    tone: 'error',
+    title: 'Nuclear missile launched',
+    summary: 'Your opponent launched a nuclear missile. The war is over.',
+    details: ['Immediate defeat confirmed.']
+  });
+  setForcedIntelView(opponent, 'Nuclear missile launched');
 }
 
 function formatDefenderAssignments(player, bucket) {
@@ -1473,6 +1509,12 @@ const server = http.createServer(async (req, res) => {
         payCost(p.resources, tech.cost);
         p.research.active = { id: actionPayload.id, ticksRemaining: tech.years * TICKS_PER_MONTH };
         appendEvent(p, room.year, `🧠 Started research: ${tech.name}`);
+        if (actionPayload.id === 'nuclear_technology') {
+          const opponent = room.players[room.playerOrder.find((id) => id !== playerId)];
+          if (opponent) {
+            appendEvent(opponent, room.year, '☢️ Opponent started Nuclear Technology research!', 'error blink');
+          }
+        }
       } else if (type === 'trade') {
         const resource = actionPayload.resource;
         const amount = Math.floor(Number(actionPayload.amount || 0));
@@ -1552,6 +1594,13 @@ const server = http.createServer(async (req, res) => {
           return writeJson(res, 400, { error: 'Not enough missile stock' });
         }
         queueAction(room, p, { type: 'missile', missileId, targetBucket: bucket });
+      } else if (type === 'nuclear_strike') {
+        if (room.winner) return writeJson(res, 400, { error: 'Match already finished' });
+        if (getRoomPhase(room) !== 'active') return writeJson(res, 400, { error: 'Match not active' });
+        if (!hasResearch(p, 'nuclear_technology', room.year)) return writeJson(res, 400, { error: 'Nuclear Technology offline' });
+        const opponent = room.players[room.playerOrder.find((id) => id !== playerId)];
+        if (!opponent) return writeJson(res, 400, { error: 'Opponent not connected' });
+        resolveNuclearStrike(room, p, opponent);
       } else if (type === 'assault') {
         const bucket = actionPayload.targetBucket;
         if (!isValidTargetBucket(bucket)) return writeJson(res, 400, { error: 'Invalid target bucket' });
