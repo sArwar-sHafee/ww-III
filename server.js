@@ -449,26 +449,10 @@ function getWarCondition(room) {
     };
   }
 
-  if (players.some((player) => playerHasPendingAction(player, ['missile', 'assault']))) {
-    return {
-      code: 'open_war',
-      label: 'Open War',
-      description: 'A missile strike or ground assault is queued for this year.'
-    };
-  }
-
-  if (players.some((player) => playerHasPendingAction(player, ['scout']))) {
-    return {
-      code: 'escalation',
-      label: 'Escalation',
-      description: 'Recon activity is queued, but no direct strike is committed yet.'
-    };
-  }
-
   return {
-    code: 'deterrence',
-    label: 'Deterrence',
-    description: 'The match is live, but neither side has queued a war-room action this year.'
+    code: 'active',
+    label: '',
+    description: ''
   };
 }
 

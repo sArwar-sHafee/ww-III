@@ -156,6 +156,7 @@ button:disabled {
   min-height: 0;
   height: 100%;
   overflow-y: auto;
+  overflow-anchor: none;
 }
 
 .left .panel {
@@ -294,6 +295,14 @@ button:disabled {
   border: 1px solid var(--border-color);
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.03);
+}
+
+.trade-stepper {
+  justify-content: space-between;
+}
+
+.trade-stepper button {
+  min-width: 44px;
 }
 
 .trade-order-list {
@@ -450,6 +459,7 @@ button:disabled {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  overflow-anchor: none;
 }
 
 .inset {

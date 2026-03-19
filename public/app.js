@@ -158,7 +158,7 @@ function getDashboardSummary() {
 }
 
 function getWarConditionLabel() {
-  return state.game?.warCondition?.label || 'Unknown';
+  return state.game?.warCondition?.label || '';
 }
 
 function getWarConditionDescription() {
@@ -203,6 +203,20 @@ function getForcedViewSeconds() {
 
 function escapeAttr(value) {
   return String(value || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
+function preserveScrollPosition(container, renderFn) {
+  if (!container) {
+    renderFn();
+    return;
+  }
+
+  const { scrollTop, scrollLeft } = container;
+  renderFn();
+  requestAnimationFrame(() => {
+    container.scrollTop = scrollTop;
+    container.scrollLeft = scrollLeft;
+  });
 }
 
 function formatAmount(value) {
@@ -344,14 +358,12 @@ function getTabSignature(game) {
     return JSON.stringify({
       phase,
       year,
-      warCondition: game.warCondition,
       pending: you.pending,
       units: you.units,
       defenceAssignments: you.defenceAssignments,
       research: you.research.completed,
       researchDisabled: you.research.disabledUntil,
-      cooldown: you.scoutCooldownUntil,
-      resources: flooredResources(you.resources)
+      cooldown: you.scoutCooldownUntil
     });
   }
 
@@ -515,6 +527,11 @@ function setTradeDraft(resource, value) {
   state.tradeDrafts[resource] = Math.max(1, Math.min(Number.isFinite(next) ? next : 1, sliderMax));
 }
 
+function adjustTradeDraft(resource, delta) {
+  const current = getTradeCardState(resource).amount;
+  setTradeDraft(resource, current + delta);
+}
+
 function getTradeReason(kind, tradeState) {
   if (!tradeState.phaseActive) return 'Match not active';
   if (tradeState.amount < 1) return 'Choose an amount';
@@ -546,10 +563,16 @@ function updateTradeCardPreview(resource) {
   }
 
   const amountEl = tabContent.querySelector(`[data-trade-amount="${resource}"]`);
-  if (amountEl) amountEl.textContent = `Selected amount: ${tradeState.amount}`;
+  if (amountEl) amountEl.textContent = `Amount: ${tradeState.amount}`;
 
   const limitsEl = tabContent.querySelector(`[data-trade-limits="${resource}"]`);
   if (limitsEl) limitsEl.textContent = `Buy max: ${tradeState.buyMax} | Sell max: ${tradeState.sellMax}`;
+
+  const decreaseBtn = tabContent.querySelector(`[data-trade-decrease="${resource}"]`);
+  if (decreaseBtn) decreaseBtn.disabled = tradeState.amount <= 1;
+
+  const increaseBtn = tabContent.querySelector(`[data-trade-increase="${resource}"]`);
+  if (increaseBtn) increaseBtn.disabled = tradeState.amount >= tradeState.sliderMax;
 
   const buyBtn = tabContent.querySelector(`[data-trade-buy="${resource}"]`);
   if (buyBtn) {
@@ -580,6 +603,22 @@ function bindTradeControls() {
       const resource = event.target.dataset.tradeAutoToggle;
       state.tradeAutoFlags[resource] = event.target.checked;
       renderTrade();
+    });
+  });
+
+  tabContent.querySelectorAll('[data-trade-decrease]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const resource = button.dataset.tradeDecrease;
+      adjustTradeDraft(resource, -1);
+      updateTradeCardPreview(resource);
+    });
+  });
+
+  tabContent.querySelectorAll('[data-trade-increase]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const resource = button.dataset.tradeIncrease;
+      adjustTradeDraft(resource, 1);
+      updateTradeCardPreview(resource);
     });
   });
 
@@ -746,7 +785,7 @@ function actionBtn(label, cb, options = {}) {
   if (!options.disabled) {
     setTimeout(() => document.getElementById(id)?.addEventListener('click', cb));
   }
-  return `<button id="${id}" ${options.disabled ? 'disabled' : ''} title="${options.title || ''}">${label}</button>`;
+  return `<button type="button" id="${id}" ${options.disabled ? 'disabled' : ''} title="${options.title || ''}">${label}</button>`;
 }
 
 function renderReasons(reasons) {
@@ -781,6 +820,8 @@ function renderDashboard() {
   const you = state.game.you;
   const opponent = state.game.opponent?.name || 'Waiting...';
   const roomCode = `<b>${state.game.roomId}</b>`;
+  const warConditionLabel = getWarConditionLabel();
+  const warConditionDescription = getWarConditionDescription();
 
   tabContent.innerHTML = `
     <h3>Dashboard</h3>
@@ -792,8 +833,8 @@ function renderDashboard() {
         <div class="small">Opponent: ${opponent}</div>
         <div class="small">💳 Credits: ${you.credits}</div>
         <div class="small">Phase: ${getPhaseLabel()}</div>
-        <div class="small">War Condition: ${getWarConditionLabel()}</div>
-        <div class="small">${getWarConditionDescription()}</div>
+        ${warConditionLabel ? `<div class="small">War Condition: ${warConditionLabel}</div>` : ''}
+        ${warConditionDescription ? `<div class="small">${warConditionDescription}</div>` : ''}
         <div class="small" id="dashboardSummary">${getDashboardSummary()}</div>
       </div>
       <div class="card">
@@ -921,7 +962,11 @@ function renderTrade() {
       <div class="row trade-amount-row">
         <input class="trade-slider" data-trade-slider="${resource}" type="range" min="0" max="${tradeState.sliderMax}" step="1" value="${tradeState.amount}" ${tradeState.sliderMax < 1 ? 'disabled' : ''} />
       </div>
-      <div class="small trade-amount-display" data-trade-amount="${resource}">Selected amount: ${tradeState.amount}</div>
+      <div class="row trade-stepper">
+        <button type="button" data-trade-decrease="${resource}" ${tradeState.amount <= 1 ? 'disabled' : ''}>-</button>
+        <div class="small trade-amount-display" data-trade-amount="${resource}">Amount: ${tradeState.amount}</div>
+        <button type="button" data-trade-increase="${resource}" ${tradeState.amount >= tradeState.sliderMax ? 'disabled' : ''}>+</button>
+      </div>
       <div class="small" data-trade-limits="${resource}">Buy max: ${tradeState.buyMax} | Sell max: ${tradeState.sellMax}</div>
       ${tradeState.autoTrade ? `<div class="small">🔁 Active auto trade: ${tradeState.autoTrade.mode} ${tradeState.autoTrade.amount} ${resource} yearly</div>` : ''}
       ${orders.length ? `<div class="trade-order-list">${orders.map((order) => `<div class="small" data-trade-order-id="${order.id}">${getTradeOrderLabel(order)}</div>`).join('')}</div>` : ''}
@@ -1040,46 +1085,45 @@ function renderSidebar() {
     <tr><td>${emojis[id] || ''} ${unit.name}</td><td>${you.units[id]}</td></tr>
   `).join('');
 
-  sidebarContentEl.innerHTML = `
-    <h3>Command Summary</h3>
-    <div class="small">📅 Year ${state.game.year}, Month ${state.game.month}</div>
-    <div class="small" id="sidebarCountdown">⏱️ ${getSidebarCountdownLabel()}</div>
-    <div class="small">👥 Population ${you.population}/${you.populationMax}</div>
-    <div class="small">💳 Credits ${you.credits}</div>
-    <div class="small">🎯 ${getPhaseLabel()}</div>
-    <div class="small">⚠️ ${getWarConditionLabel()}</div>
-    <div class="small">${getWarConditionDescription()}</div>
-    <div class="split-panels">
-      <div class="panel inset">
-        <h3>Resources</h3>
-        <table class="data-table">
-          <thead><tr><th>Resource</th><th>Total</th><th>Net</th></tr></thead>
-          <tbody>${resourceRows}</tbody>
-        </table>
+  preserveScrollPosition(sidebarContentEl, () => {
+    sidebarContentEl.innerHTML = `
+      <h3>Command Summary</h3>
+      <div class="small">📅 Year ${state.game.year}, Month ${state.game.month}</div>
+      <div class="small" id="sidebarCountdown">⏱️ ${getSidebarCountdownLabel()}</div>
+      <div class="small">👥 Population ${you.population}/${you.populationMax}</div>
+      <div class="small">💳 Credits ${you.credits}</div>
+      <div class="split-panels">
+        <div class="panel inset">
+          <h3>Resources</h3>
+          <table class="data-table">
+            <thead><tr><th>Resource</th><th>Total</th><th>Net</th></tr></thead>
+            <tbody>${resourceRows}</tbody>
+          </table>
+        </div>
+        <div class="panel inset">
+          <h3>Buildings</h3>
+          <table class="data-table">
+            <thead><tr><th>Item</th><th>Category</th><th>Owned</th></tr></thead>
+            <tbody>${buildingRows}</tbody>
+          </table>
+        </div>
+        <div class="panel inset">
+          <h3>Units</h3>
+          <table class="data-table">
+            <thead><tr><th>Unit</th><th>Owned</th></tr></thead>
+            <tbody>${unitRows}</tbody>
+          </table>
+        </div>
+        <div class="panel inset">
+          <h3>Defences</h3>
+          <table class="data-table">
+            <thead><tr><th>Defence</th><th>Owned</th></tr></thead>
+            <tbody>${defenceRows}</tbody>
+          </table>
+        </div>
       </div>
-      <div class="panel inset">
-        <h3>Buildings</h3>
-        <table class="data-table">
-          <thead><tr><th>Item</th><th>Category</th><th>Owned</th></tr></thead>
-          <tbody>${buildingRows}</tbody>
-        </table>
-      </div>
-      <div class="panel inset">
-        <h3>Units</h3>
-        <table class="data-table">
-          <thead><tr><th>Unit</th><th>Owned</th></tr></thead>
-          <tbody>${unitRows}</tbody>
-        </table>
-      </div>
-      <div class="panel inset">
-        <h3>Defences</h3>
-        <table class="data-table">
-          <thead><tr><th>Defence</th><th>Owned</th></tr></thead>
-          <tbody>${defenceRows}</tbody>
-        </table>
-      </div>
-    </div>
-  `;
+    `;
+  });
 }
 
 function refreshLiveCountdowns() {
@@ -1147,11 +1191,6 @@ function renderWarRoom() {
   }).join('');
   const assaultPayload = Object.fromEntries(getAssaultUnits().map(([id]) => [id, state.warRoomDraft[id] || 0]).filter(([, count]) => count > 0));
   tabContent.innerHTML = `<h3>War Room</h3>
-    <div class="panel inset">
-      <h3>War Condition</h3>
-      <div class="small">${getWarConditionLabel()}</div>
-      <div class="small">${getWarConditionDescription()}</div>
-    </div>
     <p>Queue actions now. All attacks resolve when the current year ends.</p>
     ${renderPendingActions()}
     <div class="card">
@@ -1203,17 +1242,26 @@ function renderWarRoom() {
   });
 }
 
-function renderTab() {
+function renderTab(options = {}) {
   if (!state.game?.you) return;
-  if (state.tab === 'dashboard') return renderDashboard();
-  if (state.tab === 'economy' || state.tab === 'supports') return renderEconomyOrSupports();
-  if (state.tab === 'trade') return renderTrade();
-  if (state.tab === 'military') return renderMilitary();
-  if (state.tab === 'defences') return renderDefences();
-  if (state.tab === 'research') return renderResearch();
-  if (state.tab === 'war_room') return renderWarRoom();
-  if (state.tab === 'defence_room') return renderDefenceRoom();
-  if (state.tab === 'opponent_intel') return renderOpponentIntel();
+  const renderActiveTab = () => {
+    if (state.tab === 'dashboard') return renderDashboard();
+    if (state.tab === 'economy' || state.tab === 'supports') return renderEconomyOrSupports();
+    if (state.tab === 'trade') return renderTrade();
+    if (state.tab === 'military') return renderMilitary();
+    if (state.tab === 'defences') return renderDefences();
+    if (state.tab === 'research') return renderResearch();
+    if (state.tab === 'war_room') return renderWarRoom();
+    if (state.tab === 'defence_room') return renderDefenceRoom();
+    if (state.tab === 'opponent_intel') return renderOpponentIntel();
+  };
+
+  if (options.preserveScroll) {
+    preserveScrollPosition(tabContent, renderActiveTab);
+    return;
+  }
+
+  renderActiveTab();
 }
 
 async function sendAction(type, payload) {
@@ -1255,7 +1303,7 @@ function renderAll() {
   const nextSignature = getTabSignature(state.game);
   if (!tabsEl.children.length) drawTabs();
   if (state.forceTabRefresh || state.lastTabSignature !== nextSignature) {
-    renderTab();
+    renderTab({ preserveScroll: state.lastTabSignature !== null });
     state.lastTabSignature = nextSignature;
     state.forceTabRefresh = false;
   }
