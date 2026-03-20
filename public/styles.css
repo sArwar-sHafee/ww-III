@@ -243,6 +243,22 @@ button:disabled {
   font-weight: 600;
 }
 
+.help-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.doc-links {
+  margin: 0.6rem 0 0 1rem;
+  padding: 0;
+  list-style: disc;
+}
+
+.doc-links li {
+  margin: 0.2rem 0;
+}
+
 
 .card {
   background: #1c1f24;

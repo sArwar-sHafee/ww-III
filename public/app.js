@@ -57,6 +57,35 @@ const tabLabels = {
   help: 'Help'
 };
 
+const SOURCE_CODE_URL = 'https://github.com/sArwar-sHafee/ww-III';
+const DOC_FILES = [
+  'Readme.md',
+  'docs/README.md',
+  'summary.md',
+  'docs/architecture/system-overview.md',
+  'docs/components/building-system.md',
+  'docs/components/combat-system.md',
+  'docs/components/game-loop.md',
+  'docs/components/networking.md',
+  'docs/components/persistence.md',
+  'docs/components/population-system.md',
+  'docs/components/research-system.md',
+  'docs/components/resource-system.md',
+  'docs/components/scouting-system.md',
+  'docs/components/ui-system.md',
+  'docs/components/unit-system.md',
+  'docs/data/events.md',
+  'docs/data/state-model.md',
+  'docs/data/tick-order.md',
+  'docs/economy/capacity-and-loss.md',
+  'docs/economy/production.md',
+  'docs/economy/resources.md',
+  'docs/rules/victory-conditions.md',
+  'docs/rules/war-condition.md',
+  'docs/rules/war-room.md',
+  'docs/ui/emoji-map.md'
+];
+
 const eventsEl = document.getElementById('events');
 const chatEl = document.getElementById('chat');
 const tabContent = document.getElementById('tabContent');
@@ -1197,35 +1226,16 @@ function renderOpponentIntel() {
 }
 
 function renderHelp() {
+  const docLinks = DOC_FILES.map((path) => `
+    <li><a href="${SOURCE_CODE_URL}/blob/main/${path}" target="_blank" rel="noreferrer">${path}</a></li>
+  `).join('');
   tabContent.innerHTML = `
     <h3>Help</h3>
     <div class="panel inset">
-      ${state.selectedResource ? getResourceDetailHtml(state.selectedResource) : '<div class="small">Click a resource on the right sidebar to view its details here.</div>'}
-      <div class="small"><b>Gameplay Overview</b></div>
-      <table class="data-table">
-        <thead><tr><th>Component</th><th>Purpose</th></tr></thead>
-        <tbody>
-          <tr><td>💹 Economy</td><td>Build resource generators and expand storage capacity.</td></tr>
-          <tr><td>🏗️ Construction</td><td>Build shelters and support structures to scale growth.</td></tr>
-          <tr><td>🔁 Trade</td><td>Buy or sell resources to stabilize shortages.</td></tr>
-          <tr><td>🔬 Research</td><td>Unlock advanced tech, buildings, and units.</td></tr>
-          <tr><td>🛡️ Defence</td><td>Prepare defensive units and structures.</td></tr>
-          <tr><td>🪖 Military</td><td>Train assault units and build strike capability.</td></tr>
-          <tr><td>🧭 Management</td><td>Assign defence assets to target buckets.</td></tr>
-          <tr><td>⚔️ War Room</td><td>Queue scouts, missiles, assaults, and nuclear strike.</td></tr>
-          <tr><td>🛰️ Opponent Intel</td><td>Review scout and combat reports.</td></tr>
-        </tbody>
-      </table>
-      <div class="small"><b>Resources</b></div>
-      <div class="small">Population consumes nutrition each year. Shelters increase population capacity. Upkeep costs are shown on each unit/building card.</div>
-      <div class="small">Key generators: 🌾 Farm → nutrition, 🪓 Lumber Camp → lumber, 🏭 Steel Mill → steel, 🥉 Copper Mine → copper, ⛏️ Alloy Quarry → alloy, 🛢️ Oil Rig → oil, 🧲 Magnet Extractor → magnet, ⚡ Power Plant → electricity, 🪟 Glassworks → glass, 🧪 Polymer Plant → polymer, 🧱 Concrete Plant → concrete, 💾 Silicon Refinery → silicon, ☢️ Uranium Mine → uranium.</div>
-      <div class="small"><b>Combat</b></div>
-      <div class="small">Scouts boost attack impact. Missiles and assaults resolve at year end. Defences only protect assigned buckets.</div>
-      <div class="small"><b>Win Conditions</b></div>
-      <div class="small">Reduce opponent population to zero, starve them for multiple years, or complete a nuclear strike.</div>
-      <div class="small"><b>At the end</b></div>
-      <div class="small">GitHub: <a href="https://github.com/sArwar-sHafee/ww-III" target="_blank" rel="noreferrer">https://github.com/sArwar-sHafee/ww-III</a></div>
-      <div class="small">Contributor: sArwar-sHafee</div>
+      <div class="help-title">Gameplay</div>
+      <div class="small"><a href="${SOURCE_CODE_URL}" target="_blank" rel="noreferrer">Source Code</a></div>
+      ${state.selectedResource ? getResourceDetailHtml(state.selectedResource) : ''}
+      <ul class="doc-links">${docLinks}</ul>
     </div>
   `;
 }
