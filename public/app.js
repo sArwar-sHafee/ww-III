@@ -1266,25 +1266,51 @@ function renderOpponentIntel() {
 }
 
 function renderHelp() {
-  const docLinks = DOC_FILES.map((path) => {
-    const label = path.split('/').pop()?.replace(/\.md$/i, '') || path;
-    const title = label.split('-').map((part) => {
-      if (!part) return part;
-      const lower = part.toLowerCase();
-      if (['ui', 'api', 'sse', 'id'].includes(lower)) return lower.toUpperCase();
-      return part[0].toUpperCase() + part.slice(1);
-    }).join(' ');
-    const pagePath = path.replace(/^docs\//, '').replace(/\.md$/i, '.html');
-    const url = `https://sarwar-shafee.github.io/ww-III/${pagePath}`;
-    return `<li><b>${title}</b> ${url}</li>`;
-  }).join('');
+  const groupOrder = ['architecture', 'components', 'data', 'economy', 'rules', 'ui'];
+  const groupedDocs = DOC_FILES.reduce((acc, path) => {
+    const rel = path.replace(/^docs\//, '');
+    const [group, ...rest] = rel.split('/');
+    if (!group) return acc;
+    acc[group] = acc[group] || [];
+    acc[group].push(rest.join('/'));
+    return acc;
+  }, {});
+  const docLinks = groupOrder
+    .filter((group) => groupedDocs[group]?.length)
+    .map((group) => {
+      const title = group[0].toUpperCase() + group.slice(1);
+      const items = groupedDocs[group].map((file) => {
+        const label = file.replace(/\.md$/i, '');
+        const name = label.split('-').map((part) => {
+          if (!part) return part;
+          const lower = part.toLowerCase();
+          if (['ui', 'api', 'sse', 'id'].includes(lower)) return lower.toUpperCase();
+          return part[0].toUpperCase() + part.slice(1);
+        }).join(' ');
+        const pagePath = `${group}/${label}.html`;
+        const displayUrl = `sarwar-shafee.github.io/ww-III/${pagePath}`;
+        const href = `https://${displayUrl}`;
+        return `
+          <li>
+            <div class="doc-name">- ${name}</div>
+            <a class="doc-url" href="${href}" target="_blank" rel="noreferrer">${displayUrl}</a>
+          </li>
+        `;
+      }).join('');
+      return `
+        <div class="doc-group">
+          <div class="doc-group-title">${title}</div>
+          <ul class="doc-links">${items}</ul>
+        </div>
+      `;
+    }).join('');
   tabContent.innerHTML = `
     <h3>Help</h3>
     <div class="panel inset">
-      ${state.selectedResource ? getResourceDetailHtml(state.selectedResource) : ''}
+      ${state.selectedResource ? `<div class="help-resource">${getResourceDetailHtml(state.selectedResource)}</div>` : ''}
       <div class="help-title">Gameplay</div>
       <div class="small"><b>Source code</b> ${SOURCE_CODE_URL}</div>
-      <ul class="doc-links">${docLinks}</ul>
+      <div class="doc-sections">${docLinks}</div>
     </div>
   `;
 }

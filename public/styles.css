@@ -249,14 +249,41 @@ button:disabled {
   margin-bottom: 0.4rem;
 }
 
+.help-resource {
+  margin-bottom: 0.6rem;
+}
+
+.doc-sections {
+  margin-top: 0.6rem;
+}
+
+.doc-group {
+  margin-top: 0.6rem;
+}
+
+.doc-group-title {
+  font-weight: 700;
+  margin-bottom: 0.2rem;
+}
+
 .doc-links {
-  margin: 0.6rem 0 0 1rem;
+  margin: 0 0 0 1rem;
   padding: 0;
   list-style: disc;
 }
 
 .doc-links li {
-  margin: 0.2rem 0;
+  margin: 0.35rem 0;
+}
+
+.doc-name {
+  font-weight: 600;
+}
+
+.doc-url {
+  display: inline-block;
+  font-size: 0.78rem;
+  color: var(--text-dim);
 }
 
 
