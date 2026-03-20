@@ -1,23 +1,13 @@
 # Component: Resource System
 
 ## Responsibility
-Track resource amounts, apply production and consumption, enforce storage capacity and zero-flooring.
+Track resource amounts, apply production and consumption, enforce storage capacity, and expose net deltas.
 
 ## Resources
 `nutrition`, `lumber`, `steel`, `copper`, `alloy`, `oil`, `magnet`, `electricity`, `glass`, `polymer`, `concrete`, `silicon`, `uranium`
 
-## Inputs
-- Building production outputs
-- Unit upkeep consumption
-- Population consumption
-- Combat loot
-- Trade actions
-
-## Outputs
-- Updated resource totals
-- Net change per resource for UI
-
 ## Rules
-- Resources never drop below 0 after resolution; any negative net change clamps to 0.
-- When capacity is full, excess production is discarded and UI should blink red.
-- Capacity is derived from building capacity per resource building.
+- Resource deltas are applied every tick and clamped to `[0, capacity]`.
+- Capacity defaults to 999999 per resource and is increased by economy buildings.
+- UI `net` values are yearly deltas computed from the current tick's net change.
+- Trade updates resources either immediately (auto) or after the trade delay (manual).

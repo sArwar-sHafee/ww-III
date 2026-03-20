@@ -1,5 +1,10 @@
 # Capacity and Loss
 
-Each resource building adds storage capacity. If capacity is full:
-- The resource number turns red and blinks.
-- Excess production is discarded.
+## Storage Capacity
+- Base capacity per resource is 999999.
+- Economy buildings add capacity for their resource.
+- Resources are clamped to capacity after each tick.
+
+## Overflow Behavior
+- Production or trade deliveries beyond capacity are discarded.
+- Buy orders that overflow are partially delivered and the remainder is refunded at the unit price.

@@ -1,6 +1,6 @@
 # Documentation Map
 
-This documentation describes the component-level design for `ww-III` (text-based real-time 2-player strategy game). It is intended for Codex to implement the game directly.
+This documentation describes the current `ww-III` prototype as implemented in `server.js` and `public/app.js`.
 
 ## What to Read First
 - `docs/architecture/system-overview.md`
@@ -32,4 +32,4 @@ This documentation describes the component-level design for `ww-III` (text-based
 - `docs/data/events.md`
 - `docs/ui/emoji-map.md`
 
-All numbers, costs, and mechanics should match `Readme.md` unless explicitly overridden here.
+All numbers and mechanics here reflect the live code. If you change gameplay constants in `server.js`, update these docs to match.

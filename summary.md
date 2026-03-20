@@ -1,61 +1,25 @@
 # Summary
 
 ## Current Prototype Rules
-- 2-player text RTS with yearly server resolution.
+- 2-player text RTS with a 1-second tick and 60-second year.
 - Resources, supports, military, defences, research, trade, and war actions are all server-controlled.
 - Credits are earned each year from population.
-- Trade converts credits and resources at 1:1 with a flat 1-credit transaction fee.
+- Manual trades have a 3-month delay and a 2-credit fee.
+- Auto trades execute yearly with a 1-credit fee.
 
-## Renames
-- Buildings -> Supports
-- Supports -> Constructions
-- Defence Room -> Management
-- House -> Shelter
-- Wall -> Land Mine
-- Soldier -> Infantry
-- Plastics -> Polymer
+## Rosters
+Military: Infantry, Special Force, Tank, War Ship, Submarine, Fighter Zed, Attack Helicopter, Combat Drone, Ballistic Missile, Cruise Missile, Scout Drone.
 
-## Military Roster
-- Infantry
-- Special Force
-- Tank
-- War Ship
-- Submarine
-- Fighter Zed
-- Attack Helicopter
-- Combat Drone
-- Ballistic Missile
-- Cruise Missile
-- Scout Drone
-
-## Defence Roster
-- Anti-Missile Battery
-- Land Mine
-- Anti-Tank Squad
-- Naval Strike Missile
-- Air Defence Gun
-- Border Guard
-
-## Defence Costs (Adjusted)
-- Anti-Missile Battery: steel 45, oil 20, magnet 18, copper 18
-- Land Mine: lumber 60, steel 40, polymer 16
-- Anti-Tank Squad: nutrition 10, steel 12, polymer 6
-- Naval Strike Missile: steel 30, alloy 24, oil 16, copper 8
-- Air Defence Gun: steel 26, alloy 14, electricity 10, copper 10
-- Border Guard: nutrition 10, polymer 6
-
-## Research Highlights
-- Missile Silo is now research, not a building.
-- Polymer replaces Plastics.
-- Existing economic, naval, aerial, and missile tech progression remains in place.
+Defence: Anti-Missile Battery, Land Mine, Anti-Tank Squad, Naval Strike Missile, Air Defence Gun, Border Guard.
 
 ## UI Tabs
-1. Dashboard
-2. Economy
+1. Economy
+2. Construction
 3. Trade
-4. Constructions
-5. Military
-6. Defences
-7. Research
+4. Research
+5. Defence
+6. Military
+7. Management
 8. War Room
-9. Management
+9. Opponent Intel
+10. Help

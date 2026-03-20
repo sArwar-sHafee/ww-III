@@ -1,44 +1,65 @@
 # State Model
 
-## Room State
+The server is authoritative. Clients only receive a player-scoped view of the room state.
+
+## Room State (Client View)
 - `roomId`: 4-digit string
 - `year`: integer
 - `month`: integer
-- `warCondition`: derived object `{code, label, description}`
-- `tickEndsAt`: server timestamp
-- `yearEndsAt`: server timestamp
-- `players`: map of `playerId -> PlayerState`
+- `phase`: `waiting` | `countdown` | `active` | `finished`
+- `warCondition`: `{ code, label, description }`
+- `tickEndsAt`: server timestamp (next tick)
+- `yearEndsAt`: server timestamp (end of current year)
+- `winner`: playerId or `null`
+- `you`: PlayerState (full local view)
+- `opponent`: `{ name }`
 
-## Player State
+## PlayerState (Client View)
+- `playerId`: string
+- `name`: string
 - `population`: int
 - `populationMax`: int
 - `credits`: int
-- `resources`: map of resource -> number
-- `buildings`: map of buildingId -> count
-- `buildingQueues`: list of `{id, ticksRemaining}`
-- `units`: map of unitId -> count
+- `resources`: map of `resource -> number`
+- `buildings`: map of `buildingId -> count`
+- `buildingQueues`: list of `{ id, ticksRemaining }`
+- `units`: map of `unitId -> count`
 - `research.completed`: list of tech ids
-- `research.active`: `{id, ticksRemaining}` or `null`
-- `pending`: queued war-room actions for the current year
-- `tradeOrders`: list of delayed trade orders `{id, resource, mode, amount, ticksRemaining}`
-- `autoTrades`: map of `resource -> {mode, amount} | null`
+- `research.active`: `{ id, ticksRemaining } | null`
+- `research.disabledUntil`: map of `techId -> year`
 - `eventLog`: last 10 events
 - `chat`: recent chat messages
+- `pending`: queued war-room actions for the current year
+- `tradeOrders`: list of delayed trade orders `{ id, resource, mode, amount, ticksRemaining }`
+- `autoTrades`: map of `resource -> { mode, amount } | null`
+- `scoutCooldownUntil`: year integer
+- `scoutIntelUntil`: map of `bucket -> year`
+- `opponentIntelLog`: list of intel entries
+- `defenceAssignments`: map of `bucket -> { id -> count }`
+- `forcedView`: `{ tab, lockedUntil, reason } | null`
+- `researchLockUntil`: year integer
+- `zeroYears`: consecutive years with all resources at 0
+- `net`: map of `resource -> yearlyDelta`
+
+## Server-Only Fields (Not Sent to Client)
+- `reconnectToken`
+- `sse` connection handle
+- `disconnected` flag
+- `playerOrder` (room ordering)
 
 ## Resource Keys
 `nutrition`, `lumber`, `steel`, `copper`, `alloy`, `oil`, `magnet`, `electricity`, `glass`, `polymer`, `concrete`, `silicon`, `uranium`
 
-## Building IDs
-- `farm`, `lumber_camp`, `steel_mill`, `copper_mine`, `alloy_quarry`, `oil_rig`, `magnet_extractor`, `power_plant`
-- `glassworks`, `polymer_plant`, `concrete_plant`, `silicon_refinery`, `uranium_mine`
-- `shelter`, `barracks`, `factory`, `radar_station`, `dry_dock`, `airfield`
-- `anti_missile_battery`, `land_mine`
+## Target Buckets
+`economy`, `buildings`, `research_center`
 
-## Unit IDs
-- `infantry`, `special_force`, `tank`, `war_ship`, `submarine`
-- `fighter_zed`, `attack_helicopter`, `combat_drone`
-- `ballistic_missile`, `cruise_missile`, `scout_drone`
-- `anti_tank_squad`, `naval_strike_missile`, `air_defence_gun`, `border_guard`
-
-## Research IDs
-`basic_tools`, `electricity`, `guided_missiles`, `missile_silo`, `industrial_furnaces`, `advanced_mining`, `tanks`, `advanced_scouting`, `polymer`, `industrial_materials`, `naval_warfare`, `aerial_warfare`, `nuclear_technology`
+## Starting State
+- Year: 0
+- Month: 1
+- Population: 10
+- Population max: 10
+- Credits: 0
+- Resources: nutrition 200, lumber 60, steel 40, copper 30, all others 0
+- Buildings: farm 1, lumber_camp 1, steel_mill 1, copper_mine 1, shelter 2, all others 0
+- Units: all 0
+- Research: none

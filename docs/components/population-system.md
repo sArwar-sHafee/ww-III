@@ -3,17 +3,9 @@
 ## Responsibility
 Handle nutrition consumption, starvation, and population growth.
 
-## Inputs
-- Current population
-- Current nutrition stock
-- Housing capacity
-
-## Outputs
-- Updated population
-- Event log entries
-
 ## Rules
-- Consumption: 0.8 nutrition per person per year.
-- If nutrition hits 0, 10% of the current population dies per year until nutrition is available.
-- Surplus nutrition (more than 10 extra per person) gives +0.2 population growth per year, rounded down.
-- Population is capped by Shelter capacity.
+- Consumption: 0.25 nutrition per person per year, applied every tick.
+- Starvation: at year end, if nutrition is 0, population drops.
+- Starvation loss: if population > 10, lose `ceil(population * 0.2)`, otherwise lose up to 2.
+- Growth: at year end, if population < populationMax, grow by `max(1, floor(population * 0.1))`.
+- Shelter increases populationMax by +5 per completed building.
