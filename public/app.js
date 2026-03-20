@@ -1224,7 +1224,7 @@ function renderDefenceRoom() {
   const buildingEntries = getDefenceAssignableBuildings();
   const unitEntries = getDefenceAssignableUnits();
   tabContent.innerHTML = `
-    <h3>Management</h3>
+    <h3>Guardrail</h3>
     <div class="small">Assign defence assets into Economy, Buildings, or Research Center. Only assigned defences will respond to attacks on that bucket.</div>
     <div class="defence-room-grid">
       ${getTargetBuckets().map(([bucket, config]) => `
