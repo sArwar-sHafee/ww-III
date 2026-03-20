@@ -207,7 +207,7 @@ const UNITS = {
     strike: {
       economy: { buildingLosses: 4, resourcePct: 0.15 },
       buildings: { buildingLosses: 3, populationLoss: 6 },
-      research_center: { delayMonths: 12, disableYears: 2 }
+      research_center: { disableYears: 2 }
     }
   },
   cruise_missile: {
@@ -221,7 +221,7 @@ const UNITS = {
     strike: {
       economy: { buildingLosses: 2, resourcePct: 0.08 },
       buildings: { buildingLosses: 2, populationLoss: 3 },
-      research_center: { delayMonths: 6, disableYears: 2 }
+      research_center: { disableYears: 2 }
     }
   },
   scout_drone: { name: 'Scout Drone', section: 'military', cost: { oil: 5, electricity: 3, copper: 2, glass: 2 }, upkeep: { electricity: 0.08 }, requiresBuilding: 'radar_station' },
@@ -439,7 +439,6 @@ function scaleBucketImpact(impact = {}, modifier = 1) {
     resourcePct: (impact.resourcePct || 0) * modifier,
     lootPct: (impact.lootPct || 0) * modifier,
     populationLoss: scaleImpactValue(impact.populationLoss, modifier),
-    delayMonths: scaleImpactValue(impact.delayMonths, modifier),
     disableYears: scaleImpactValue(impact.disableYears, modifier)
   };
 }
@@ -851,22 +850,41 @@ function applyBuildingsImpact(defender, { buildingLosses = 0, populationLoss = 0
   return details.length ? details : ['Buildings held under pressure.'];
 }
 
-function applyResearchCenterImpact(room, defender, { delayMonths = 0, disableYears = 0 }) {
+function removeCompletedResearch(defender, count) {
+  const destroyed = [];
+  while (destroyed.length < count && defender.research.completed.length) {
+    const techId = defender.research.completed.pop();
+    if (!techId) break;
+    delete defender.research.disabledUntil?.[techId];
+    delete defender.research.disabledUntilTick?.[techId];
+    destroyed.push(techId);
+  }
+  return destroyed;
+}
+
+function applyResearchCenterImpact(room, defender, { disableYears = 0 }) {
   const details = [];
-  if (defender.research.active) {
-    const techId = defender.research.active.id;
-    const totalMonths = Math.max(1, Math.ceil(RESEARCH[techId]?.years || 1));
-    const disableMonths = Math.max(1, Math.ceil(totalMonths / 2));
-    const untilTick = room.ticks + (disableMonths * TICKS_PER_MONTH);
+  const activeTechId = defender.research.active?.id || null;
+
+  if (activeTechId) {
     defender.research.active = null;
-    defender.research.disabledUntilTick[techId] = Math.max(getResearchDisableTick(defender, techId), untilTick);
-    details.push(`🔬 ${RESEARCH[techId]?.name || techId} canceled and disabled for ${disableMonths} months`);
-  } else if (delayMonths > 0) {
-    details.push('🔬 No active research to cancel');
+    delete defender.research.disabledUntil?.[activeTechId];
+    delete defender.research.disabledUntilTick?.[activeTechId];
+    details.push(`🔬 ${RESEARCH[activeTechId]?.name || activeTechId} destroyed; research progress lost`);
+  } else {
+    details.push('🔬 No active research to destroy');
+  }
+
+  const completedLossCount = activeTechId ? 1 : 2;
+  const destroyedCompleted = removeCompletedResearch(defender, completedLossCount);
+  if (destroyedCompleted.length) {
+    details.push(...destroyedCompleted.map((techId) => `💥 Completed research destroyed: ${RESEARCH[techId]?.name || techId}`));
+  } else {
+    details.push('💥 No completed research available to destroy');
   }
 
   if (disableYears > 0) {
-    defender.researchLockUntil = Math.max(defender.researchLockUntil, room.year + 2);
+    defender.researchLockUntil = Math.max(defender.researchLockUntil, room.year + Math.ceil(disableYears));
     details.push(`🔒 New research blocked until Year ${defender.researchLockUntil}`);
   }
 
@@ -878,7 +896,6 @@ function getAttackPopulationLoss(impact = {}) {
     + (impact.resourcePct || 0) * 10
     + (impact.lootPct || 0) * 10
     + (impact.populationLoss || 0)
-    + (impact.delayMonths || 0) / 3
     + (impact.disableYears || 0) * 2;
   if (score <= 0) return 1;
   return Math.max(1, Math.min(10, Math.ceil(score)));
@@ -1158,7 +1175,7 @@ function resolveAssaultAction(room, player, opponent, action) {
       ? { buildingLosses: Math.min(4, survivorScore), lootPct: Math.min(0.18, 0.06 + survivorScore * 0.02) }
       : bucket === 'buildings'
         ? { buildingLosses: Math.min(4, Math.max(1, survivorScore)), populationLoss: Math.min(8, survivorScore * 2) }
-        : { delayMonths: Math.max(3, survivorScore * 3), disableYears: 2 };
+        : { disableYears: 2 };
     const impact = scaleBucketImpact(baseImpact, attackModifier);
     const impactDetails = [
       describeAttackImpactModifier(attackModifier),

@@ -43,15 +43,15 @@
 - Ties are resolved by building id alphabetical order.
 
 ## Research Center Impact
-- A successful hit cancels the active research if one exists.
-- The canceled tech is disabled for `ceil(fullResearchDurationMonths / 2)`.
-- Completed techs are never disabled by Research Center hits.
+- A successful hit destroys the active research if one exists, wiping its current progress.
+- If there is active research, the hit also destroys 1 completed research; otherwise it destroys 2 completed researches.
+- Destroyed completed researches are removed from the end of the completed list first.
 - New research is blocked for 2 years after a successful Research Center hit.
 
 ## Extra Population Casualties
 - Every successful missile or assault also applies extra population casualties.
 - Severity score is:
-- `(buildingLosses * 2) + (resourcePct * 10) + (lootPct * 10) + populationLoss + (delayMonths / 3) + (disableYears * 2)`
+- `(buildingLosses * 2) + (resourcePct * 10) + (lootPct * 10) + populationLoss + (disableYears * 2)`
 - Extra casualties are `ceil(severityScore)`, capped between `1` and `10`.
 
 ## Defender Depletion

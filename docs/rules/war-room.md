@@ -27,8 +27,8 @@ All war actions target one of three buckets:
 ### Missile Payloads
 | Missile | Economy Impact | Buildings Impact | Research Center Impact | Integrity |
 | --- | --- | --- | --- | --- |
-| Ballistic Missile | buildingLosses 4, resourcePct 0.15 | buildingLosses 3, populationLoss 6 | active research canceled, new research blocked 2 years, severity 12 | 1.5 |
-| Cruise Missile | buildingLosses 2, resourcePct 0.08 | buildingLosses 2, populationLoss 3 | active research canceled, new research blocked 2 years, severity 6 | 1 |
+| Ballistic Missile | buildingLosses 4, resourcePct 0.15 | buildingLosses 3, populationLoss 6 | destroy active research, destroy 1 completed research (or 2 completed if no active), block new research 2 years | 1.5 |
+| Cruise Missile | buildingLosses 2, resourcePct 0.08 | buildingLosses 2, populationLoss 3 | destroy active research, destroy 1 completed research (or 2 completed if no active), block new research 2 years | 1 |
 
 ## Assaults
 - Only one assault can be queued per year.
@@ -43,7 +43,7 @@ All war actions target one of three buckets:
 ### Assault Impact (on attacker win)
 - `economy`: buildingLosses up to 4, lootPct up to 0.18 across every resource.
 - `buildings`: buildingLosses up to 4, populationLoss up to 8.
-- `research_center`: active research canceled, that tech disabled for half of its total duration, new research blocked 2 years.
+- `research_center`: destroy active research, destroy 1 completed research (or 2 completed researches if there is no active one), and block new research for 2 years.
 - All impacts are scaled by scout intel efficiency.
 - Successful missile or assault impacts also inflict additional population loss based on impact severity (minimum 1).
 
@@ -75,9 +75,9 @@ All war actions target one of three buckets:
 - Ties are resolved by building id alphabetical order.
 
 ## Research Center Rule
-- Completed techs are never disabled by Research Center attacks.
-- If there is active research, the hit cancels it immediately.
-- The canceled tech is disabled for half of its full duration, rounded up to whole months.
+- If there is active research, the hit destroys it immediately and the player must restart it from zero later.
+- The same hit also destroys 1 completed research; if there is no active research, it destroys 2 completed researches instead.
+- Destroyed completed researches are removed from the end of the completed list first.
 - New research is blocked for 2 years after a successful Research Center hit.
 
 ## Nuclear Strike
