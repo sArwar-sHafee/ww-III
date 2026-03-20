@@ -12,7 +12,8 @@ const SSE_HEARTBEAT_MS = 15_000;
 const TICK_MS = 1000;
 const TICKS_PER_YEAR = 60;
 const TICKS_PER_MONTH = 5;
-const TRADE_FEE = 1;
+const TRADE_FEE_MANUAL = 2;
+const TRADE_FEE_AUTO = 1;
 const STARTING_RESOURCES = { nutrition: 200, lumber: 60, steel: 40, copper: 30, alloy: 0, oil: 0, magnet: 0, electricity: 0, glass: 0, polymer: 0, concrete: 0, silicon: 0, uranium: 0 };
 const RESOURCE_KEYS = Object.keys(STARTING_RESOURCES);
 const TRADE_DELAY_MONTHS = 3;
@@ -30,7 +31,7 @@ const TRADE_PRICES = {
   polymer: 4,
   concrete: 3,
   silicon: 6,
-  uranium: 12
+  uranium: 60
 };
 const STARTING_POPULATION = 10;
 const STARTING_POPULATION_MAX = 10;
@@ -262,19 +263,19 @@ const UNITS = {
 };
 
 const RESEARCH = {
-  basic_tools: { name: 'Basic Tools', cost: { alloy: 15, lumber: 10 }, years: 2, minYear: 3 },
-  electricity: { name: 'Electricity', cost: { alloy: 25, magnet: 5, copper: 12 }, years: 3, prereq: 'basic_tools' },
-  guided_missiles: { name: 'Guided Missiles', cost: { alloy: 30, magnet: 10, copper: 8 }, years: 3, prereq: 'basic_tools' },
-  missile_silo: { name: 'Missile Silo', cost: { alloy: 45, magnet: 20, steel: 10, concrete: 20, uranium: 8 }, years: 4, prereq: 'guided_missiles' },
-  industrial_furnaces: { name: 'Industrial Furnaces', cost: { alloy: 20, steel: 5, copper: 6 }, years: 2, prereq: 'basic_tools' },
-  advanced_mining: { name: 'Advanced Mining', cost: { alloy: 35, magnet: 15, copper: 12 }, years: 3, prereq: 'electricity' },
-  tanks: { name: 'Tank Technology', cost: { alloy: 40, magnet: 20, oil: 10, copper: 10 }, years: 4, prereq: 'guided_missiles' },
-  naval_warfare: { name: 'Naval Warfare', cost: { alloy: 40, magnet: 20, concrete: 10 }, years: 4, prereq: 'basic_tools' },
-  aerial_warfare: { name: 'Aerial Warfare', cost: { alloy: 50, silicon: 20, copper: 15, glass: 10 }, years: 4, prereq: 'electricity' },
-  advanced_scouting: { name: 'Advanced Scouting', cost: { alloy: 25, magnet: 10, copper: 10, silicon: 8 }, years: 2, prereq: 'industrial_furnaces' },
-  polymer: { name: 'Polymer Research', cost: { alloy: 30, oil: 10, copper: 5 }, years: 3, prereq: 'electricity' },
-  industrial_materials: { name: 'Industrial Materials', cost: { alloy: 20, steel: 5, electricity: 5, glass: 10, concrete: 10 }, years: 2, prereq: 'industrial_furnaces' },
-  nuclear_technology: { name: 'Nuclear Technology', cost: { alloy: 100, magnet: 50, electricity: 30, uranium: 20, copper: 15 }, years: 120, prereq: 'advanced_mining' }
+  basic_tools: { name: 'Basic Tools', cost: { alloy: 15, lumber: 10 }, years: 9, minYear: 3 },
+  electricity: { name: 'Electricity', cost: { alloy: 25, magnet: 5, copper: 12 }, years: 12, prereq: 'basic_tools' },
+  guided_missiles: { name: 'Guided Missiles', cost: { alloy: 30, magnet: 10, copper: 8 }, years: 12, prereq: 'basic_tools' },
+  missile_silo: { name: 'Missile Silo', cost: { alloy: 45, magnet: 20, steel: 10, concrete: 20, uranium: 8 }, years: 12, prereq: 'guided_missiles' },
+  industrial_furnaces: { name: 'Industrial Furnaces', cost: { alloy: 20, steel: 5, copper: 6 }, years: 9, prereq: 'basic_tools' },
+  advanced_mining: { name: 'Advanced Mining', cost: { alloy: 35, magnet: 15, copper: 12 }, years: 12, prereq: 'electricity' },
+  tanks: { name: 'Tank Technology', cost: { alloy: 40, magnet: 20, oil: 10, copper: 10 }, years: 12, prereq: 'guided_missiles' },
+  naval_warfare: { name: 'Naval Warfare', cost: { alloy: 40, magnet: 20, concrete: 10 }, years: 12, prereq: 'basic_tools' },
+  aerial_warfare: { name: 'Aerial Warfare', cost: { alloy: 50, silicon: 20, copper: 15, glass: 10 }, years: 12, prereq: 'electricity' },
+  advanced_scouting: { name: 'Advanced Scouting', cost: { alloy: 25, magnet: 10, copper: 10, silicon: 8 }, years: 9, prereq: 'industrial_furnaces' },
+  polymer: { name: 'Polymer Research', cost: { alloy: 30, oil: 10, copper: 5 }, years: 12, prereq: 'electricity' },
+  industrial_materials: { name: 'Industrial Materials', cost: { alloy: 20, steel: 5, electricity: 5, glass: 10, concrete: 10 }, years: 9, prereq: 'industrial_furnaces' },
+  nuclear_technology: { name: 'Nuclear Technology', cost: { alloy: 100, magnet: 50, electricity: 30, uranium: 20, copper: 15 }, years: 12, prereq: 'advanced_mining' }
 };
 
 const TARGET_BUCKETS = {
@@ -346,7 +347,7 @@ const STARTING_UNITS = {
   border_guard: 0
 };
 
-const STARTING_RESEARCH = ['basic_tools'];
+const STARTING_RESEARCH = [];
 
 const rooms = new Map();
 
@@ -557,12 +558,12 @@ function getTradeUnitPrice(resource) {
   return TRADE_PRICES[resource] || 1;
 }
 
-function getTradeBuyCost(resource, amount) {
-  return amount * getTradeUnitPrice(resource) + TRADE_FEE;
+function getTradeBuyCost(resource, amount, fee = TRADE_FEE_MANUAL) {
+  return amount * getTradeUnitPrice(resource) + fee;
 }
 
-function getTradeSellRevenue(resource, amount) {
-  return Math.max(0, amount * getTradeUnitPrice(resource) - TRADE_FEE);
+function getTradeSellRevenue(resource, amount, fee = TRADE_FEE_MANUAL) {
+  return Math.max(0, amount * getTradeUnitPrice(resource) - fee);
 }
 
 function getEntityConfig(id) {
@@ -837,6 +838,18 @@ function applyResearchCenterImpact(room, defender, { delayMonths = 0, disableCou
   return details.length ? details : ['Research Center stayed online.'];
 }
 
+function getAttackPopulationLoss(impact = {}) {
+  const score = (impact.buildingLosses || 0) * 2
+    + (impact.resourcePct || 0) * 10
+    + (impact.lootPct || 0) * 10
+    + (impact.populationLoss || 0)
+    + (impact.delayMonths || 0) / 3
+    + (impact.disableCount || 0) * 2
+    + (impact.disableYears || 0) * 2;
+  if (score <= 0) return 1;
+  return Math.max(1, Math.min(10, Math.ceil(score)));
+}
+
 function resolveNuclearStrike(room, player, opponent) {
   room.winner = player.playerId;
   appendEvent(player, room.year, '☢️ Nuclear missile launched. Victory secured.');
@@ -884,9 +897,19 @@ function buildScoutReport(room, opponent, bucket) {
 }
 
 function applyBucketImpact(room, attacker, defender, bucket, impact) {
-  if (bucket === 'economy') return applyEconomyImpact(attacker, defender, impact);
-  if (bucket === 'buildings') return applyBuildingsImpact(defender, impact);
-  return applyResearchCenterImpact(room, defender, impact);
+  let details = [];
+  if (bucket === 'economy') details = applyEconomyImpact(attacker, defender, impact);
+  else if (bucket === 'buildings') details = applyBuildingsImpact(defender, impact);
+  else details = applyResearchCenterImpact(room, defender, impact);
+
+  const extraLoss = getAttackPopulationLoss(impact);
+  if (extraLoss > 0 && defender.population > 0) {
+    const actualLoss = Math.min(defender.population, extraLoss);
+    defender.population -= actualLoss;
+    details.push(`Population: -${actualLoss} (attack casualties)`);
+  }
+
+  return details;
 }
 
 function getReservedIncomingTradeAmount(player, resource) {
@@ -926,7 +949,7 @@ function resolveAutoTrades(room, player) {
     if (!config) continue;
 
     if (config.mode === 'buy') {
-      const cost = getTradeBuyCost(resource, config.amount);
+      const cost = getTradeBuyCost(resource, config.amount, TRADE_FEE_AUTO);
       const capacity = getPlayerCapacity(player)[resource];
       const reservedIncoming = getReservedIncomingTradeAmount(player, resource);
       if (player.credits < cost) {
@@ -948,7 +971,7 @@ function resolveAutoTrades(room, player) {
       continue;
     }
 
-    const revenue = getTradeSellRevenue(resource, config.amount);
+    const revenue = getTradeSellRevenue(resource, config.amount, TRADE_FEE_AUTO);
     player.resources[resource] -= config.amount;
     player.credits += revenue;
     appendEvent(player, room.year, `🔁 Auto sold ${config.amount} ${resource} for ${revenue} credits`);
@@ -1234,13 +1257,15 @@ function resolveTick(room) {
     // 6 population growth or starvation at year end
     if (isYearEnd) {
       if (p.resources.nutrition <= 0 && p.population > 0) {
-        const starvationLoss = Math.min(p.population, Math.max(1, Math.ceil(p.population * 0.1)));
+        const starvationLoss = p.population > 10
+          ? Math.min(p.population, Math.max(1, Math.ceil(p.population * 0.2)))
+          : Math.min(p.population, 2);
         p.population -= starvationLoss;
         appendEvent(p, room.year, `☠️ Population starvation: -${starvationLoss}`);
       }
       const surplus = p.resources.nutrition - p.population * 10;
       if (surplus > 10 && p.population < p.populationMax) {
-        const growth = Math.floor(0.2 * p.population);
+        const growth = Math.max(1, Math.floor(0.1 * p.population));
         if (growth > 0) {
           p.population = Math.min(p.populationMax, p.population + growth);
           appendEvent(p, room.year, `👶 Population growth: +${growth}`);
@@ -1527,7 +1552,7 @@ const server = http.createServer(async (req, res) => {
         if (!RESOURCE_KEYS.includes(resource)) return writeJson(res, 400, { error: 'Invalid resource' });
         if (!Number.isInteger(amount) || amount < 1) return writeJson(res, 400, { error: 'Invalid amount' });
         if (mode === 'buy') {
-          const cost = getTradeBuyCost(resource, amount);
+          const cost = getTradeBuyCost(resource, amount, TRADE_FEE_MANUAL);
           const capacity = getPlayerCapacity(p)[resource];
           const reservedIncoming = getReservedIncomingTradeAmount(p, resource);
           if (p.credits < cost) return writeJson(res, 400, { error: 'Not enough credits' });
@@ -1641,7 +1666,8 @@ const server = http.createServer(async (req, res) => {
         tickMs: TICK_MS,
         ticksPerMonth: TICKS_PER_MONTH,
         ticksPerYear: TICKS_PER_YEAR,
-        tradeFee: TRADE_FEE,
+        tradeFeeManual: TRADE_FEE_MANUAL,
+        tradeFeeAuto: TRADE_FEE_AUTO,
         tradeDelayMonths: TRADE_DELAY_MONTHS,
         tradePrices: TRADE_PRICES
       });

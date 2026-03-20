@@ -5,7 +5,7 @@ const state = {
   reconnectToken: null,
   meta: null,
   game: null,
-  tab: 'dashboard',
+  tab: 'economy',
   lastStateAt: 0,
   pollTimer: null,
   es: null,
@@ -23,7 +23,8 @@ const state = {
   missileDraft: 1,
   selectedAssaultTarget: 'economy',
   warRoomDraft: {},
-  lockUiActive: false
+  lockUiActive: false,
+  selectedResource: null
 };
 
 const DEFAULT_API_ORIGIN = 'https://ww-iii.onrender.com';
@@ -42,18 +43,18 @@ const emojis = {
   anti_missile_battery: '🛡️', land_mine: '💣',
   infantry: '🪖', special_force: '🎖️', tank: '🛞', war_ship: '🚢', submarine: '🚤', fighter_zed: '🛩️', attack_helicopter: '🚁', combat_drone: '🤖', ballistic_missile: '🚀', cruise_missile: '☄️', scout_drone: '🛰️', anti_tank_squad: '🧨', naval_strike_missile: '🧿', air_defence_gun: '🎯', border_guard: '🛂'
 };
-const tabs = ['dashboard', 'economy', 'trade', 'supports', 'military', 'defences', 'research', 'war_room', 'defence_room', 'opponent_intel'];
+const tabs = ['economy', 'supports', 'trade', 'research', 'defences', 'military', 'defence_room', 'war_room', 'opponent_intel', 'help'];
 const tabLabels = {
-  dashboard: 'Dashboard',
   economy: 'Economy',
+  supports: 'Construction',
   trade: 'Trade',
-  supports: 'Constructions',
-  military: 'Military',
-  defences: 'Defences',
   research: 'Research',
-  war_room: 'War Room',
+  defences: 'Defence',
+  military: 'Military',
   defence_room: 'Management',
-  opponent_intel: 'Opponent Intel'
+  war_room: 'War Room',
+  opponent_intel: 'Opponent Intel',
+  help: 'Help'
 };
 
 const eventsEl = document.getElementById('events');
@@ -462,9 +463,9 @@ function getDestroyedByLine(unitId) {
   return sources.length ? `Destroyed by ${formatDestroyedBy(sources)}` : '';
 }
 
-function getResourceConsumptionTooltip(resource) {
+function getResourceConsumptionDetails(resource) {
   const you = state.game?.you;
-  if (!you) return 'No yearly consumption';
+  if (!you) return [];
   const rows = [];
   if (resource === 'nutrition' && you.population > 0) rows.push(`${emojis.people} - ${formatAmount(you.population * POPULATION_NUTRITION_PER_YEAR)}`);
   for (const [id, building] of Object.entries(state.meta?.buildings || {})) {
@@ -477,24 +478,76 @@ function getResourceConsumptionTooltip(resource) {
     const value = unit.upkeep?.[resource];
     if (count > 0 && value > 0) rows.push(`${emojis[id] || ''} - ${formatAmount(count * value)}`);
   }
-  return rows.length ? rows.join('\n') : 'No yearly consumption';
+  return rows;
+}
+
+function getResourceGenerationDetails(resource) {
+  const you = state.game?.you;
+  if (!you) return [];
+  const rows = [];
+  for (const [id, building] of Object.entries(state.meta?.buildings || {})) {
+    const count = you.buildings?.[id] || 0;
+    const value = building.production?.[resource];
+    if (count > 0 && value > 0) rows.push(`${emojis[id] || ''} - ${formatAmount(count * value)}`);
+  }
+  return rows;
+}
+
+function getResourceAutoTradeDetails(resource) {
+  const auto = state.game?.you?.autoTrades?.[resource];
+  if (!auto) return 'None';
+  return `${auto.mode === 'buy' ? 'Buy' : 'Sell'} ${auto.amount} yearly`;
+}
+
+function getResourceDetailTooltip(resource) {
+  const generation = getResourceGenerationDetails(resource);
+  const consumption = getResourceConsumptionDetails(resource);
+  const autoTrade = getResourceAutoTradeDetails(resource);
+  const lines = [
+    'Generation:',
+    ...(generation.length ? generation : ['None']),
+    'Consumption:',
+    ...(consumption.length ? consumption : ['None']),
+    `Auto trade: ${autoTrade}`
+  ];
+  return lines.join('\n');
+}
+
+function getResourceDetailHtml(resource) {
+  const generation = getResourceGenerationDetails(resource);
+  const consumption = getResourceConsumptionDetails(resource);
+  const autoTrade = getResourceAutoTradeDetails(resource);
+  return `
+    <div class="resource-detail-block">
+      <div class="small"><b>${emojis[resource] || ''} ${resource}</b></div>
+      <div class="small">Generation: ${generation.length ? generation.join(', ') : 'None'}</div>
+      <div class="small">Consumption: ${consumption.length ? consumption.join(', ') : 'None'}</div>
+      <div class="small">Auto trade: ${autoTrade}</div>
+    </div>
+  `;
 }
 
 function getTradeUnitPrice(resource) {
   return state.meta?.tradePrices?.[resource] || 1;
 }
 
-function getTradeBuyCost(resource, amount) {
-  return amount * getTradeUnitPrice(resource) + (state.meta?.tradeFee || 1);
+function getTradeFee(autoMode) {
+  if (autoMode) return state.meta?.tradeFeeAuto ?? 1;
+  return state.meta?.tradeFeeManual ?? 1;
 }
 
-function getTradeSellReturn(resource, amount) {
-  return Math.max(0, amount * getTradeUnitPrice(resource) - (state.meta?.tradeFee || 1));
+function getTradeBuyCost(resource, amount, autoMode) {
+  return amount * getTradeUnitPrice(resource) + getTradeFee(autoMode);
+}
+
+function getTradeSellReturn(resource, amount, autoMode) {
+  return Math.max(0, amount * getTradeUnitPrice(resource) - getTradeFee(autoMode));
 }
 
 function isTradeAutoMode(resource) {
+  if (state.game?.you?.autoTrades?.[resource]) return true;
   if (typeof state.tradeAutoFlags[resource] === 'boolean') return state.tradeAutoFlags[resource];
-  return Boolean(state.game?.you?.autoTrades?.[resource]);
+  return false;
 }
 
 function getTradeCardState(resource) {
@@ -502,7 +555,8 @@ function getTradeCardState(resource) {
   const stock = Math.floor(you?.resources?.[resource] || 0);
   const credits = Math.floor(you?.credits || 0);
   const price = getTradeUnitPrice(resource);
-  const fee = state.meta?.tradeFee || 1;
+  const autoMode = isTradeAutoMode(resource);
+  const fee = getTradeFee(autoMode);
   const capacity = getResourceCapacity(resource, you?.buildings || {});
   const freeSpace = Number.isFinite(capacity) ? Math.max(0, Math.floor(capacity - stock)) : Infinity;
   const buyMaxByCredits = credits >= fee + price ? Math.floor((credits - fee) / price) : 0;
@@ -525,7 +579,7 @@ function getTradeCardState(resource) {
   return {
     amount,
     autoTrade,
-    buyCost: amount > 0 ? getTradeBuyCost(resource, amount) : 0,
+    buyCost: amount > 0 ? getTradeBuyCost(resource, amount, autoMode) : 0,
     buyDisabled,
     buyMax,
     capacity,
@@ -534,7 +588,7 @@ function getTradeCardState(resource) {
     price,
     sellDisabled,
     sellMax,
-    sellReturn: amount > 0 ? getTradeSellReturn(resource, amount) : 0,
+    sellReturn: amount > 0 ? getTradeSellReturn(resource, amount, autoMode) : 0,
     sliderMax,
     stock
   };
@@ -582,7 +636,7 @@ function updateTradeCardPreview(resource) {
   if (sliderEl) {
     sliderEl.max = String(tradeState.sliderMax);
     sliderEl.value = String(tradeState.amount);
-    sliderEl.disabled = tradeState.sliderMax < 1;
+    sliderEl.disabled = autoTradeLocked || tradeState.sliderMax < 1;
   }
 
   const amountEl = tabContent.querySelector(`[data-trade-amount="${resource}"]`);
@@ -592,10 +646,10 @@ function updateTradeCardPreview(resource) {
   if (limitsEl) limitsEl.textContent = `Buy max: ${tradeState.buyMax} | Sell max: ${tradeState.sellMax}`;
 
   const decreaseBtn = tabContent.querySelector(`[data-trade-decrease="${resource}"]`);
-  if (decreaseBtn) decreaseBtn.disabled = tradeState.amount <= 1;
+  if (decreaseBtn) decreaseBtn.disabled = autoTradeLocked || tradeState.amount <= 1;
 
   const increaseBtn = tabContent.querySelector(`[data-trade-increase="${resource}"]`);
-  if (increaseBtn) increaseBtn.disabled = tradeState.amount >= tradeState.sliderMax;
+  if (increaseBtn) increaseBtn.disabled = autoTradeLocked || tradeState.amount >= tradeState.sliderMax;
 
   const buyBtn = tabContent.querySelector(`[data-trade-buy="${resource}"]`);
   if (buyBtn) {
@@ -898,7 +952,7 @@ function renderEconomyOrSupports() {
   const ids = Object.keys(state.meta.buildings).filter((id) => state.tab === 'economy'
     ? state.meta.buildings[id].category === 'economy'
     : state.meta.buildings[id].category === 'support');
-  tabContent.innerHTML = `<h3>${state.tab === 'economy' ? 'Economy' : 'Constructions'}</h3><div class="action-grid">` + ids.map((id) => {
+  tabContent.innerHTML = `<h3>${state.tab === 'economy' ? 'Economy' : 'Construction'}</h3><div class="action-grid">` + ids.map((id) => {
     const building = state.meta.buildings[id];
     const cardState = getBuildCardState(id);
     const label = cardState.inQueue ? `Building... (${ticksToMonths(cardState.inQueue.ticksRemaining)} months)` : 'Build';
@@ -982,7 +1036,7 @@ function renderDefences() {
 
   tabContent.innerHTML = `
     <div class="panel inset">
-      <h3>Defences</h3>
+      <h3>Defence</h3>
       <div class="action-grid">${defenceBuildings}${defenceUnits}</div>
     </div>
   `;
@@ -1002,18 +1056,18 @@ function renderTrade() {
     return `<div class="card trade-card">
       <b>${emojis[resource] || ''} ${resource}</b>
       <div class="small">Stock: ${tradeState.stock} | Credits: ${you.credits}</div>
-      <div class="small">Rate: ${tradeState.price} credit${tradeState.price === 1 ? '' : 's'} per unit + ${tradeState.fee} credit trade fee</div>
+      <div class="small">Rate: ${tradeState.price} credit${tradeState.price === 1 ? '' : 's'} per unit + ${tradeState.fee} credit ${autoMode ? 'auto' : 'manual'} fee</div>
       <label class="small trade-auto-toggle">
-        <input type="checkbox" data-trade-auto-toggle="${resource}" ${autoMode ? 'checked' : ''} />
+        <input type="checkbox" data-trade-auto-toggle="${resource}" ${autoMode ? 'checked' : ''} ${tradeState.autoTrade ? 'disabled' : ''} />
         Auto trade
       </label>
       <div class="row trade-amount-row">
-        <input class="trade-slider" data-trade-slider="${resource}" type="range" min="0" max="${tradeState.sliderMax}" step="1" value="${tradeState.amount}" ${tradeState.sliderMax < 1 ? 'disabled' : ''} />
+        <input class="trade-slider" data-trade-slider="${resource}" type="range" min="0" max="${tradeState.sliderMax}" step="1" value="${tradeState.amount}" ${(autoTradeLocked || tradeState.sliderMax < 1) ? 'disabled' : ''} />
       </div>
       <div class="row trade-stepper">
-        <button type="button" data-trade-decrease="${resource}" ${tradeState.amount <= 1 ? 'disabled' : ''}>-</button>
+        <button type="button" data-trade-decrease="${resource}" ${(autoTradeLocked || tradeState.amount <= 1) ? 'disabled' : ''}>-</button>
         <div class="small trade-amount-display" data-trade-amount="${resource}">Amount: ${tradeState.amount}</div>
-        <button type="button" data-trade-increase="${resource}" ${tradeState.amount >= tradeState.sliderMax ? 'disabled' : ''}>+</button>
+        <button type="button" data-trade-increase="${resource}" ${(autoTradeLocked || tradeState.amount >= tradeState.sliderMax) ? 'disabled' : ''}>+</button>
       </div>
       <div class="small" data-trade-limits="${resource}">Buy max: ${tradeState.buyMax} | Sell max: ${tradeState.sellMax}</div>
       ${tradeState.autoTrade ? `<div class="small">🔁 Active auto trade: ${tradeState.autoTrade.mode} ${tradeState.autoTrade.amount} ${resource} yearly</div>` : ''}
@@ -1029,6 +1083,7 @@ function renderTrade() {
   tabContent.innerHTML = `
     <h3>Trade</h3>
     <div class="small">Population generates credits at year end. Manual trades reserve the selected amount now and settle after ${state.meta.tradeDelayMonths || 3} months.</div>
+    <div class="small">Manual trade fee: ${state.meta.tradeFeeManual ?? 2} credits. Auto trade fee: ${state.meta.tradeFeeAuto ?? 1} credit.</div>
     <div class="small">Treasury: ${you.credits} credits</div>
     <div class="action-grid">${rows}</div>
   `;
@@ -1110,14 +1165,42 @@ function renderOpponentIntel() {
   `;
 }
 
+function renderHelp() {
+  tabContent.innerHTML = `
+    <h3>Help</h3>
+    <div class="panel inset">
+      <div class="small"><b>Goal</b></div>
+      <div class="small">Grow your nation, survive shortages, and defeat your opponent before they defeat you.</div>
+      <div class="small"><b>Resources: what consumes and generates</b></div>
+      <div class="small">Economy buildings generate resources yearly. Buildings and units consume upkeep yearly. Population consumes nutrition yearly.</div>
+      <div class="small">Use the right sidebar resource table to view generation, consumption, and auto trade status for each resource.</div>
+      <div class="small">Key generators: Farm → nutrition, Lumber Camp → lumber, Steel Mill → steel, Copper Mine → copper, Alloy Quarry → alloy, Oil Rig → oil, Magnet Extractor → magnet, Power Plant → electricity, Glassworks → glass, Polymer Plant → polymer, Concrete Plant → concrete, Silicon Refinery → silicon, Uranium Mine → uranium.</div>
+      <div class="small">Shelters increase population capacity. Military and advanced buildings often require upkeep like oil or electricity.</div>
+      <div class="small"><b>Trade</b></div>
+      <div class="small">Manual trade places an order that settles after a few months. Auto trade repeats every year for the selected resource.</div>
+      <div class="small"><b>Research</b></div>
+      <div class="small">Research unlocks advanced buildings and units. Only one research can run at a time.</div>
+      <div class="small"><b>Combat</b></div>
+      <div class="small">Use scouts to reveal targets and increase attack impact. Missiles and assaults resolve at year end. Defences only protect assigned buckets.</div>
+      <div class="small"><b>Ways to win</b></div>
+      <div class="small">Reduce the opponent population to zero, starve them for multiple years, or complete a nuclear strike.</div>
+      <div class="small"><b>At the end</b></div>
+      <div class="small">GitHub: <a href="https://github.com/sArwar-sHafee/ww-III" target="_blank" rel="noreferrer">https://github.com/sArwar-sHafee/ww-III</a></div>
+      <div class="small">Contributor: sArwar-sHafee</div>
+    </div>
+  `;
+}
+
 function renderSidebar() {
   const you = state.game.you;
   const resourceRows = state.meta.resources.map((resource) => {
     const value = Math.floor(you.resources[resource]);
     const net = you.net?.[resource] ?? 0;
     const cls = getResourceStateClass(value, net);
-    const tooltip = escapeAttr(getResourceConsumptionTooltip(resource));
-    return `<tr class="${cls}" title="${tooltip}"><td title="${tooltip}">${emojis[resource] || ''} ${resource}</td><td>${value}</td><td>${formatDelta(net)}</td></tr>`;
+    const tooltip = escapeAttr(getResourceDetailTooltip(resource));
+    const autoTrade = you.autoTrades?.[resource];
+    const autoLabel = autoTrade ? `${autoTrade.mode === 'buy' ? 'Buy' : 'Sell'} ${autoTrade.amount}/yr` : '-';
+    return `<tr class="${cls} resource-row" data-resource-row="${resource}" title="${tooltip}"><td title="${tooltip}">${emojis[resource] || ''} ${resource}</td><td>${value}</td><td>${formatDelta(net)}</td><td>${autoLabel}</td></tr>`;
   }).join('');
 
   const buildingRows = Object.entries(state.meta.buildings)
@@ -1148,9 +1231,12 @@ function renderSidebar() {
         <div class="panel inset">
           <h3>Resources</h3>
           <table class="data-table">
-            <thead><tr><th>Resource</th><th>Total</th><th>Net</th></tr></thead>
+            <thead><tr><th>Resource</th><th>Total</th><th>Net</th><th>Auto</th></tr></thead>
             <tbody>${resourceRows}</tbody>
           </table>
+          <div class="small" id="resourceDetails">
+            ${state.selectedResource ? getResourceDetailHtml(state.selectedResource) : '<div class="small">Click a resource to view generation and consumption.</div>'}
+          </div>
         </div>
         <div class="panel inset">
           <h3>Buildings</h3>
@@ -1175,6 +1261,13 @@ function renderSidebar() {
         </div>
       </div>
     `;
+  });
+
+  sidebarContentEl.querySelectorAll('[data-resource-row]').forEach((row) => {
+    row.addEventListener('click', () => {
+      state.selectedResource = row.dataset.resourceRow;
+      renderSidebar();
+    });
   });
 }
 
@@ -1312,7 +1405,6 @@ function renderWarRoom() {
 function renderTab(options = {}) {
   if (!state.game?.you) return;
   const renderActiveTab = () => {
-    if (state.tab === 'dashboard') return renderDashboard();
     if (state.tab === 'economy' || state.tab === 'supports') return renderEconomyOrSupports();
     if (state.tab === 'trade') return renderTrade();
     if (state.tab === 'military') return renderMilitary();
@@ -1321,6 +1413,7 @@ function renderTab(options = {}) {
     if (state.tab === 'war_room') return renderWarRoom();
     if (state.tab === 'defence_room') return renderDefenceRoom();
     if (state.tab === 'opponent_intel') return renderOpponentIntel();
+    if (state.tab === 'help') return renderHelp();
   };
 
   if (options.preserveScroll) {
@@ -1384,6 +1477,7 @@ function applyGameState(game) {
     state.lastTabSignature = null;
     state.forceTabRefresh = true;
   }
+  if (!tabs.includes(state.tab)) state.tab = tabs[0];
   if (game?.you?.name) nameEl.value = game.you.name;
   if (state.game?.phase === 'finished') {
     clearSession();
@@ -1461,6 +1555,7 @@ document.getElementById('createBtn').addEventListener('click', async () => {
   try {
     await ensureMeta();
     const name = nameEl.value.trim() || 'Commander';
+    setNotice('Creating game... please wait.', 'warn');
     const data = await api('/api/room/create', { name });
     state.roomId = data.roomId;
     state.playerId = data.playerId;
@@ -1469,6 +1564,7 @@ document.getElementById('createBtn').addEventListener('click', async () => {
     roomInfoEl.textContent = '';
     saveSession();
     connectStream();
+    setNotice(null);
   } catch (error) {
     setNotice(error.message, 'error');
   }
