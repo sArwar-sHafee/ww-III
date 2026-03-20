@@ -20,7 +20,7 @@ Resolve missile strikes and assaults at year end.
 - Attacker commits assault-capable units.
 - Defender roster is the bucket's assigned defence units and structures.
 - Combat runs up to 3 rounds where defenders fire based on their combat profiles.
-- Defenders do not take losses in the current implementation.
+- Defenders are destroyed if they fully spend their 3-round kill capacity during the invasion.
 - An assault succeeds if at least one attacking unit survives the defender fire.
 - On win, the bucket receives scaled impact (see `docs/rules/war-room.md`).
 

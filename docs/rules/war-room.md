@@ -34,8 +34,9 @@ All war actions target one of three buckets:
 - Only one assault can be queued per year.
 - Any assault-capable unit may be committed.
 - Defenders are the assets assigned to the target bucket.
-- Defenders apply combat profiles; defenders do not take losses in the current build.
+- Defenders apply combat profiles.
 - Combat lasts up to 3 defender rounds.
+- A defender asset is destroyed when it fully spends its 3-round kill capacity during the invasion.
 - An assault succeeds if at least one attacking unit survives those rounds.
 - Surviving attacker battle points determine post-battle impact.
 

@@ -304,6 +304,7 @@ const SUPPORT_BUILDING_IDS = Object.entries(BUILDINGS).filter(([, cfg]) => cfg.c
 const DEFENCE_BUILDING_IDS = Object.entries(BUILDINGS).filter(([, cfg]) => cfg.defenceAssignable).map(([id]) => id);
 const DEFENCE_ASSIGNABLE_UNIT_IDS = Object.entries(UNITS).filter(([, unit]) => unit.defenceAssignable).map(([id]) => id);
 const DEFENCE_ASSIGNABLE_IDS = [...DEFENCE_BUILDING_IDS, ...DEFENCE_ASSIGNABLE_UNIT_IDS];
+const ASSAULT_DEFENCE_ROUNDS = 3;
 
 const STARTING_BUILDINGS = {
   farm: 1,
@@ -663,6 +664,7 @@ function getCombatScore(roster = {}) {
 
 function resolveCombatWave(sourceRoster, targetRoster) {
   const kills = {};
+  const sourceUsed = {};
   for (const [attackerId, count] of Object.entries(sourceRoster)) {
     let available = count;
     for (const [targetId, ratio] of getCombatProfile(attackerId)) {
@@ -674,10 +676,14 @@ function resolveCombatWave(sourceRoster, targetRoster) {
       const actual = Math.min(remaining, potential);
       if (actual <= 0) continue;
       kills[targetId] = (kills[targetId] || 0) + actual;
-      available = Math.max(0, available - Math.ceil(actual / ratio));
+      const spent = actual === potential
+        ? available
+        : Math.min(available, actual / Math.max(1, Math.floor(ratio)));
+      sourceUsed[attackerId] = (sourceUsed[attackerId] || 0) + spent;
+      available = Math.max(0, available - spent);
     }
   }
-  return kills;
+  return { kills, sourceUsed };
 }
 
 function applyRosterLosses(roster, kills) {
@@ -704,14 +710,25 @@ function getRosterLosses(initialRoster, finalRoster) {
 function simulateCombat(attackerRoster, defenderRoster) {
   const attackers = clonePositiveRoster(attackerRoster);
   const defenders = clonePositiveRoster(defenderRoster);
+  const defenderUsage = {};
   let rounds = 0;
 
-  while (rounds < 3 && hasCombatants(attackers) && hasCombatants(defenders)) {
+  while (rounds < ASSAULT_DEFENCE_ROUNDS && hasCombatants(attackers) && hasCombatants(defenders)) {
     rounds += 1;
-    const defenderKills = resolveCombatWave(defenders, attackers);
+    const { kills: defenderKills, sourceUsed } = resolveCombatWave(defenders, attackers);
+    for (const [id, used] of Object.entries(sourceUsed)) {
+      defenderUsage[id] = (defenderUsage[id] || 0) + used;
+    }
     const actualAttackerLosses = applyRosterLosses(attackers, defenderKills);
     if (!Object.keys(actualAttackerLosses).length) break;
   }
+
+  const defenderExhausted = {};
+  for (const [id, totalUsed] of Object.entries(defenderUsage)) {
+    const removed = Math.min(defenders[id] || 0, Math.floor(totalUsed / ASSAULT_DEFENCE_ROUNDS));
+    if (removed > 0) defenderExhausted[id] = removed;
+  }
+  const defenderLosses = applyRosterLosses(defenders, defenderExhausted);
 
   const attackerScore = getCombatScore(attackers);
   const defenderScore = getCombatScore(defenders);
@@ -722,7 +739,7 @@ function simulateCombat(attackerRoster, defenderRoster) {
     attackersRemaining: attackers,
     defendersRemaining: defenders,
     attackerLosses: getRosterLosses(attackerRoster, attackers),
-    defenderLosses: {},
+    defenderLosses,
     attackerScore,
     defenderScore
   };
