@@ -52,7 +52,7 @@ const tabLabels = {
   research: 'Research',
   defences: 'Defence',
   military: 'Military',
-  defence_room: 'Management',
+  defence_room: 'Guardrail',
   war_room: 'War Room',
   opponent_intel: 'Opponent Intel',
   help: 'Help'
