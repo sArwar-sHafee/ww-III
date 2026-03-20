@@ -128,6 +128,12 @@ function setNotice(message, type = 'info') {
   renderStatusBanner();
 }
 
+function waitForNextPaint() {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
+}
+
 function saveSession() {
   if (!state.roomId || !state.playerId || !state.reconnectToken) return;
   localStorage.setItem(SESSION_KEY, JSON.stringify({
@@ -1310,7 +1316,7 @@ function renderHelp() {
     <div class="panel inset">
       ${state.selectedResource ? `<div class="help-resource">${getResourceDetailHtml(state.selectedResource)}</div>` : ''}
       <div class="help-title">Gameplay</div>
-      <div class="small"><b>Source code</b> ${SOURCE_CODE_URL}</div>
+      <div class="small"><b>Source code</b> <a class="doc-url source-code-link" href="${SOURCE_CODE_URL}" target="_blank" rel="noreferrer">${SOURCE_CODE_URL}</a></div>
       <div class="doc-sections">${docLinks}</div>
     </div>
   `;
@@ -1682,9 +1688,10 @@ async function restoreSession() {
 
 document.getElementById('createBtn').addEventListener('click', async () => {
   try {
-    await ensureMeta();
     const name = nameEl.value.trim() || 'Commander';
     setNotice('Creating game... please wait.', 'warn');
+    await waitForNextPaint();
+    await ensureMeta();
     const data = await api('/api/room/create', { name });
     state.roomId = data.roomId;
     state.playerId = data.playerId;
