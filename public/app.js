@@ -1292,7 +1292,7 @@ function renderHelp() {
         const href = `https://${displayUrl}`;
         return `
           <li>
-            <div class="doc-name">- ${name}</div>
+            <div class="doc-name"> ${name}</div>
             <a class="doc-url" href="${href}" target="_blank" rel="noreferrer">${displayUrl}</a>
           </li>
         `;
