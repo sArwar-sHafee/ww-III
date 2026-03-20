@@ -19,9 +19,9 @@ Resolve missile strikes and assaults at year end.
 ## Assault Resolution
 - Attacker commits assault-capable units.
 - Defender roster is the bucket's assigned defence units and structures.
-- Combat runs up to 6 rounds where defenders fire based on their combat profiles.
+- Combat runs up to 3 rounds where defenders fire based on their combat profiles.
 - Defenders do not take losses in the current implementation.
-- Attacker wins if remaining attacker combat score exceeds defender score.
+- An assault succeeds if at least one attacking unit survives the defender fire.
 - On win, the bucket receives scaled impact (see `docs/rules/war-room.md`).
 
 ## Combat Profiles

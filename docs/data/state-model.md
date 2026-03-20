@@ -4,6 +4,7 @@ The server is authoritative. Clients only receive a player-scoped view of the ro
 
 ## Room State (Client View)
 - `roomId`: 4-digit string
+- `ticks`: integer tick counter from match start
 - `year`: integer
 - `month`: integer
 - `phase`: `waiting` | `countdown` | `active` | `finished`
@@ -27,6 +28,7 @@ The server is authoritative. Clients only receive a player-scoped view of the ro
 - `research.completed`: list of tech ids
 - `research.active`: `{ id, ticksRemaining } | null`
 - `research.disabledUntil`: map of `techId -> year`
+- `research.disabledUntilTick`: map of `techId -> tick`
 - `eventLog`: last 10 events
 - `chat`: recent chat messages
 - `pending`: queued war-room actions for the current year

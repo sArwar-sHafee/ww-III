@@ -64,7 +64,7 @@ const BUILDINGS = {
     category: 'military',
     defenceAssignable: true,
     defense: 24,
-    combatWeight: 24,
+    combatWeight: 16,
     missileIntercept: [['ballistic_missile', 0.5], ['cruise_missile', 1]]
   },
   land_mine: {
@@ -74,7 +74,7 @@ const BUILDINGS = {
     category: 'military',
     defenceAssignable: true,
     defense: 18,
-    combatWeight: 18,
+    combatWeight: 12,
     combatProfile: [['tank', 1], ['infantry', 4], ['special_force', 4]]
   },
   dry_dock: { name: 'Dry Dock', cost: { lumber: 45, steel: 35, concrete: 25, polymer: 10 }, buildTime: 3, category: 'support' },
@@ -196,7 +196,7 @@ const UNITS = {
     strike: {
       economy: { buildingLosses: 4, resourcePct: 0.15 },
       buildings: { buildingLosses: 3, populationLoss: 6 },
-      research_center: { delayMonths: 12, disableCount: 2, disableYears: 2 }
+      research_center: { delayMonths: 12, disableYears: 2 }
     }
   },
   cruise_missile: {
@@ -210,7 +210,7 @@ const UNITS = {
     strike: {
       economy: { buildingLosses: 2, resourcePct: 0.08 },
       buildings: { buildingLosses: 2, populationLoss: 3 },
-      research_center: { delayMonths: 6, disableCount: 1, disableYears: 1 }
+      research_center: { delayMonths: 6, disableYears: 2 }
     }
   },
   scout_drone: { name: 'Scout Drone', section: 'military', cost: { oil: 5, electricity: 3, copper: 2, glass: 2 }, upkeep: { electricity: 0.08 }, requiresBuilding: 'radar_station' },
@@ -220,7 +220,7 @@ const UNITS = {
     cost: { nutrition: 10, steel: 12, polymer: 6 },
     upkeep: { nutrition: 0.15 },
     defense: 18,
-    combatWeight: 18,
+    combatWeight: 12,
     requiresTech: 'tanks',
     requiresBuilding: 'barracks',
     defenceAssignable: true,
@@ -231,7 +231,7 @@ const UNITS = {
     section: 'defence',
     cost: { steel: 30, alloy: 24, oil: 16, copper: 8 },
     defense: 45,
-    combatWeight: 45,
+    combatWeight: 30,
     requiresTech: 'guided_missiles',
     requiresBuilding: 'dry_dock',
     defenceAssignable: true,
@@ -243,7 +243,7 @@ const UNITS = {
     cost: { steel: 26, alloy: 14, electricity: 10, copper: 10 },
     upkeep: { electricity: 0.08, copper: 0.05 },
     defense: 28,
-    combatWeight: 28,
+    combatWeight: 19,
     requiresTech: 'guided_missiles',
     requiresBuilding: 'airfield',
     defenceAssignable: true,
@@ -255,7 +255,7 @@ const UNITS = {
     cost: { nutrition: 10, polymer: 6 },
     upkeep: { nutrition: 0.15 },
     defense: 12,
-    combatWeight: 12,
+    combatWeight: 8,
     requiresBuilding: 'barracks',
     defenceAssignable: true,
     combatProfile: [['infantry', 1], ['special_force', 1], ['tank', 0.2]]
@@ -285,25 +285,25 @@ const TARGET_BUCKETS = {
 };
 const TARGET_BUCKET_KEYS = Object.keys(TARGET_BUCKETS);
 const ECONOMY_BUILDING_IDS = Object.entries(BUILDINGS).filter(([, cfg]) => cfg.category === 'economy').map(([id]) => id);
+const ECONOMY_BUILDING_PRIORITY = [
+  'uranium_mine',
+  'silicon_refinery',
+  'concrete_plant',
+  'polymer_plant',
+  'glassworks',
+  'power_plant',
+  'magnet_extractor',
+  'oil_rig',
+  'alloy_quarry',
+  'copper_mine',
+  'steel_mill',
+  'lumber_camp',
+  'farm'
+];
 const SUPPORT_BUILDING_IDS = Object.entries(BUILDINGS).filter(([, cfg]) => cfg.category === 'support').map(([id]) => id);
 const DEFENCE_BUILDING_IDS = Object.entries(BUILDINGS).filter(([, cfg]) => cfg.defenceAssignable).map(([id]) => id);
 const DEFENCE_ASSIGNABLE_UNIT_IDS = Object.entries(UNITS).filter(([, unit]) => unit.defenceAssignable).map(([id]) => id);
 const DEFENCE_ASSIGNABLE_IDS = [...DEFENCE_BUILDING_IDS, ...DEFENCE_ASSIGNABLE_UNIT_IDS];
-const RESEARCH_DISRUPTION_PRIORITY = [
-  'nuclear_technology',
-  'missile_silo',
-  'aerial_warfare',
-  'naval_warfare',
-  'tanks',
-  'advanced_scouting',
-  'guided_missiles',
-  'industrial_materials',
-  'polymer',
-  'advanced_mining',
-  'electricity',
-  'basic_tools',
-  'industrial_furnaces'
-];
 
 const STARTING_BUILDINGS = {
   farm: 1,
@@ -374,7 +374,7 @@ function createPlayer(playerId, name) {
     buildings: Object.fromEntries(Object.keys(BUILDINGS).map((k) => [k, STARTING_BUILDINGS[k] || 0])),
     buildingQueues: [],
     units: { ...STARTING_UNITS },
-    research: { completed: [...STARTING_RESEARCH], active: null, disabledUntil: {} },
+    research: { completed: [...STARTING_RESEARCH], active: null, disabledUntil: {}, disabledUntilTick: {} },
     eventLog: [],
     chat: [],
     pending: [],
@@ -428,7 +428,6 @@ function scaleBucketImpact(impact = {}, modifier = 1) {
     lootPct: (impact.lootPct || 0) * modifier,
     populationLoss: scaleImpactValue(impact.populationLoss, modifier),
     delayMonths: scaleImpactValue(impact.delayMonths, modifier),
-    disableCount: scaleImpactValue(impact.disableCount, modifier),
     disableYears: scaleImpactValue(impact.disableYears, modifier)
   };
 }
@@ -451,12 +450,24 @@ function appendIntel(player, year, entry) {
   });
 }
 
-function hasResearch(player, techId, year) {
-  return player.research.completed.includes(techId) && year >= (player.research.disabledUntil?.[techId] || -1);
+function hasResearch(player, techId, year, currentTick = Number.MAX_SAFE_INTEGER) {
+  return player.research.completed.includes(techId)
+    && year >= (player.research.disabledUntil?.[techId] || -1)
+    && currentTick >= (player.research.disabledUntilTick?.[techId] || -1);
 }
 
 function getResearchDisableYear(player, techId) {
   return player.research.disabledUntil?.[techId] || -1;
+}
+
+function getResearchDisableTick(player, techId) {
+  return player.research.disabledUntilTick?.[techId] || -1;
+}
+
+function getResearchDisableMonthsRemaining(player, techId, currentTick) {
+  const remainingTicks = Math.max(0, getResearchDisableTick(player, techId) - currentTick);
+  if (remainingTicks <= 0) return 0;
+  return Math.ceil(remainingTicks / TICKS_PER_MONTH);
 }
 
 function getRoomPhase(room) {
@@ -695,7 +706,7 @@ function simulateCombat(attackerRoster, defenderRoster) {
   const defenders = clonePositiveRoster(defenderRoster);
   let rounds = 0;
 
-  while (rounds < 6 && hasCombatants(attackers) && hasCombatants(defenders)) {
+  while (rounds < 3 && hasCombatants(attackers) && hasCombatants(defenders)) {
     rounds += 1;
     const defenderKills = resolveCombatWave(defenders, attackers);
     const actualAttackerLosses = applyRosterLosses(attackers, defenderKills);
@@ -704,7 +715,7 @@ function simulateCombat(attackerRoster, defenderRoster) {
 
   const attackerScore = getCombatScore(attackers);
   const defenderScore = getCombatScore(defenders);
-  const attackerWon = hasCombatants(attackers) && (!hasCombatants(defenders) || attackerScore > defenderScore);
+  const attackerWon = hasCombatants(attackers);
 
   return {
     attackerWon,
@@ -738,13 +749,15 @@ function getMissileInterceptScore(player, bucket, missileId) {
   return score;
 }
 
-function removeBuildings(player, ids, amount) {
+function removeBuildings(player, ids, amount, priority = null) {
   const losses = {};
   let remaining = Math.max(0, Math.floor(amount || 0));
   while (remaining > 0) {
-    const target = ids
-      .filter((id) => (player.buildings[id] || 0) > 0)
-      .sort((a, b) => (player.buildings[b] - player.buildings[a]) || a.localeCompare(b))[0];
+    const target = priority?.length
+      ? priority.find((id) => ids.includes(id) && (player.buildings[id] || 0) > 0)
+      : ids
+        .filter((id) => (player.buildings[id] || 0) > 0)
+        .sort((a, b) => (player.buildings[b] - player.buildings[a]) || a.localeCompare(b))[0];
     if (!target) break;
     losses[target] = (losses[target] || 0) + 1;
     player.buildings[target] -= 1;
@@ -765,17 +778,16 @@ function summarizeCountMap(losses, labelSource) {
 
 function applyEconomyImpact(attacker, defender, { buildingLosses = 0, resourcePct = 0, lootPct = 0 }) {
   const details = [];
-  const losses = removeBuildings(defender, ECONOMY_BUILDING_IDS, buildingLosses);
+  const losses = removeBuildings(defender, ECONOMY_BUILDING_IDS, buildingLosses, ECONOMY_BUILDING_PRIORITY);
   details.push(...summarizeCountMap(losses, BUILDINGS));
 
   if (lootPct > 0) {
-    const targetResource = [...RESOURCE_KEYS]
-      .sort((a, b) => (defender.resources[b] - defender.resources[a]) || a.localeCompare(b))[0];
-    const amount = targetResource ? Math.floor(defender.resources[targetResource] * lootPct) : 0;
-    if (targetResource && amount > 0) {
-      defender.resources[targetResource] -= amount;
-      attacker.resources[targetResource] += amount;
-      details.push(`Looted ${amount} ${targetResource}`);
+    for (const resource of RESOURCE_KEYS) {
+      const amount = Math.floor((defender.resources[resource] || 0) * lootPct);
+      if (amount <= 0) continue;
+      defender.resources[resource] -= amount;
+      attacker.resources[resource] += amount;
+      details.push(`Looted ${amount} ${resource}`);
     }
   } else if (resourcePct > 0) {
     const targets = [...RESOURCE_KEYS]
@@ -804,34 +816,22 @@ function applyBuildingsImpact(defender, { buildingLosses = 0, populationLoss = 0
   return details.length ? details : ['Buildings held under pressure.'];
 }
 
-function applyResearchCenterImpact(room, defender, { delayMonths = 0, disableCount = 0, disableYears = 0 }) {
+function applyResearchCenterImpact(room, defender, { delayMonths = 0, disableYears = 0 }) {
   const details = [];
-  const nuking = defender.research.active?.id === 'nuclear_technology';
-  if (nuking && (delayMonths > 0 || disableCount > 0 || disableYears > 0)) {
+  if (defender.research.active) {
+    const techId = defender.research.active.id;
+    const totalMonths = Math.max(1, Math.ceil(RESEARCH[techId]?.years || 1));
+    const disableMonths = Math.max(1, Math.ceil(totalMonths / 2));
+    const untilTick = room.ticks + (disableMonths * TICKS_PER_MONTH);
     defender.research.active = null;
-    const disabledUntil = room.year + Math.max(1, disableYears || 1);
-    defender.research.disabledUntil.nuclear_technology = Math.max(getResearchDisableYear(defender, 'nuclear_technology'), disabledUntil);
-    details.push(`Nuclear Technology research halted until Year ${defender.research.disabledUntil.nuclear_technology}`);
-  }
-
-  if (delayMonths > 0 && defender.research.active) {
-    defender.research.active.ticksRemaining += delayMonths * TICKS_PER_MONTH;
-    details.push(`${RESEARCH[defender.research.active.id]?.name || defender.research.active.id} delayed ${delayMonths} months`);
-  }
-
-  const untilYear = disableYears > 0 ? room.year + disableYears : room.year;
-  const candidates = RESEARCH_DISRUPTION_PRIORITY
-    .filter((techId) => defender.research.completed.includes(techId))
-    .sort((a, b) => (getResearchDisableYear(defender, a) - getResearchDisableYear(defender, b)) || a.localeCompare(b))
-    .slice(0, disableCount);
-
-  for (const techId of candidates) {
-    defender.research.disabledUntil[techId] = Math.max(getResearchDisableYear(defender, techId), untilYear);
-    details.push(`${RESEARCH[techId]?.name || techId} disabled until Year ${defender.research.disabledUntil[techId]}`);
+    defender.research.disabledUntilTick[techId] = Math.max(getResearchDisableTick(defender, techId), untilTick);
+    details.push(`${RESEARCH[techId]?.name || techId} canceled and disabled for ${disableMonths} months`);
+  } else if (delayMonths > 0) {
+    details.push('No active research to cancel');
   }
 
   if (disableYears > 0) {
-    defender.researchLockUntil = Math.max(defender.researchLockUntil, untilYear);
+    defender.researchLockUntil = Math.max(defender.researchLockUntil, room.year + 2);
     details.push(`New research blocked until Year ${defender.researchLockUntil}`);
   }
 
@@ -844,7 +844,6 @@ function getAttackPopulationLoss(impact = {}) {
     + (impact.lootPct || 0) * 10
     + (impact.populationLoss || 0)
     + (impact.delayMonths || 0) / 3
-    + (impact.disableCount || 0) * 2
     + (impact.disableYears || 0) * 2;
   if (score <= 0) return 1;
   return Math.max(1, Math.min(10, Math.ceil(score)));
@@ -883,12 +882,10 @@ function buildScoutReport(room, opponent, bucket) {
       details.push('Active research: none');
     }
     details.push(opponent.researchLockUntil > room.year ? `Research lock until Year ${opponent.researchLockUntil}` : 'Research lock: none');
-    details.push(...opponent.research.completed.map((techId) => {
-      const disabledUntil = getResearchDisableYear(opponent, techId);
-      return disabledUntil > room.year
-        ? `${RESEARCH[techId]?.name || techId}: disabled until Year ${disabledUntil}`
-        : `${RESEARCH[techId]?.name || techId}: online`;
-    }));
+    details.push(...opponent.research.completed.map((techId) => `${RESEARCH[techId]?.name || techId}: completed`));
+    details.push(...Object.keys(opponent.research.disabledUntilTick || {})
+      .filter((techId) => getResearchDisableMonthsRemaining(opponent, techId, room.ticks) > 0)
+      .map((techId) => `${RESEARCH[techId]?.name || techId}: disabled for ${getResearchDisableMonthsRemaining(opponent, techId, room.ticks)} more months`));
   }
 
   const defenders = formatDefenderAssignments(opponent, bucket);
@@ -1006,7 +1003,7 @@ function resolveScoutAction(room, player, opponent, action) {
 function resolveMissileAction(room, player, opponent, action) {
   const missile = UNITS[action.missileId];
   const bucket = isValidTargetBucket(action.targetBucket) ? action.targetBucket : 'economy';
-  if (!missile?.missile || !hasResearch(player, 'missile_silo', room.year) || player.units[action.missileId] <= 0) return;
+  if (!missile?.missile || !hasResearch(player, 'missile_silo', room.year, room.ticks) || player.units[action.missileId] <= 0) return;
   const total = Math.max(1, Math.floor(Number(action.amount || 1)));
   for (let i = 0; i < total; i += 1) {
     if (player.units[action.missileId] <= 0) break;
@@ -1110,7 +1107,7 @@ function resolveAssaultAction(room, player, opponent, action) {
       ? { buildingLosses: Math.min(4, survivorScore), lootPct: Math.min(0.18, 0.06 + survivorScore * 0.02) }
       : bucket === 'buildings'
         ? { buildingLosses: Math.min(4, Math.max(1, survivorScore)), populationLoss: Math.min(8, survivorScore * 2) }
-        : { delayMonths: Math.max(3, survivorScore * 3), disableCount: Math.min(2, survivorScore), disableYears: survivorScore >= 2 ? 2 : 1 };
+        : { delayMonths: Math.max(3, survivorScore * 3), disableYears: 2 };
     const impact = scaleBucketImpact(baseImpact, attackModifier);
     const impactDetails = [
       describeAttackImpactModifier(attackModifier),
@@ -1213,7 +1210,7 @@ function resolveTick(room) {
     addResourceDelta(deltas, 'nutrition', -POPULATION_NUTRITION_PER_YEAR * p.population * tickScale);
 
     // 2 building production
-    const toolBonus = hasResearch(p, 'basic_tools', room.year) ? 1.2 : 1;
+    const toolBonus = hasResearch(p, 'basic_tools', room.year, room.ticks) ? 1.2 : 1;
     const factoryBonus = p.buildings.factory > 0 ? 1.2 : 1;
     for (const [id, cfg] of Object.entries(BUILDINGS)) {
       const count = p.buildings[id];
@@ -1298,6 +1295,7 @@ function stripStateFor(room, playerId) {
   const opp = room.players[otherId];
   return {
     roomId: room.roomId,
+    ticks: room.ticks,
     year: room.year,
     month: room.month,
     phase: getRoomPhase(room),
@@ -1482,7 +1480,7 @@ const server = http.createServer(async (req, res) => {
       if (type === 'build') {
         const cfg = BUILDINGS[actionPayload.id];
         if (!cfg) return writeJson(res, 400, { error: 'Invalid building' });
-        if (cfg.requires && !cfg.requires.every((x) => hasResearch(p, x, room.year))) {
+        if (cfg.requires && !cfg.requires.every((x) => hasResearch(p, x, room.year, room.ticks))) {
           appendEvent(p, room.year, `❌ Build failed: Research missing for ${cfg.name}`, 'error');
           broadcastRoom(room);
           return writeJson(res, 400, { error: 'Research missing' });
@@ -1503,7 +1501,7 @@ const server = http.createServer(async (req, res) => {
           broadcastRoom(room);
           return writeJson(res, 400, { error: 'Required building missing' });
         }
-        if (unit.requiresTech && !hasResearch(p, unit.requiresTech, room.year)) {
+        if (unit.requiresTech && !hasResearch(p, unit.requiresTech, room.year, room.ticks)) {
           appendEvent(p, room.year, `❌ Training failed: Research missing for ${unit.name}`, 'error');
           broadcastRoom(room);
           return writeJson(res, 400, { error: 'Research missing' });
@@ -1524,8 +1522,10 @@ const server = http.createServer(async (req, res) => {
         if (p.research.active) return writeJson(res, 400, { error: 'Research in progress' });
         if (p.research.completed.includes(actionPayload.id)) return writeJson(res, 400, { error: 'Already researched' });
         if (room.year < p.researchLockUntil) return writeJson(res, 400, { error: `Research locked until Year ${p.researchLockUntil}` });
+        const disabledMonths = getResearchDisableMonthsRemaining(p, actionPayload.id, room.ticks);
+        if (disabledMonths > 0) return writeJson(res, 400, { error: `Research disabled for ${disabledMonths} more months` });
         if (tech.minYear && room.year < tech.minYear) return writeJson(res, 400, { error: 'Not available yet' });
-        if (tech.prereq && !hasResearch(p, tech.prereq, room.year)) {
+        if (tech.prereq && !hasResearch(p, tech.prereq, room.year, room.ticks)) {
           appendEvent(p, room.year, `❌ Research failed: Prerequisite missing for ${tech.name}`, 'error');
           broadcastRoom(room);
           return writeJson(res, 400, { error: 'Prerequisite missing' });
@@ -1619,7 +1619,7 @@ const server = http.createServer(async (req, res) => {
         const amount = Math.max(1, Math.floor(Number(actionPayload.amount || 1)));
         if (!isValidTargetBucket(bucket)) return writeJson(res, 400, { error: 'Invalid target bucket' });
         if (!UNITS[missileId]?.missile) return writeJson(res, 400, { error: 'Invalid missile' });
-        if (!hasResearch(p, 'missile_silo', room.year)) return writeJson(res, 400, { error: 'Missile Silo offline' });
+        if (!hasResearch(p, 'missile_silo', room.year, room.ticks)) return writeJson(res, 400, { error: 'Missile Silo offline' });
         if ((p.units[missileId] || 0) - getPendingMissileReservations(p, missileId) < amount) {
           return writeJson(res, 400, { error: 'Not enough missile stock' });
         }
@@ -1627,7 +1627,7 @@ const server = http.createServer(async (req, res) => {
       } else if (type === 'nuclear_strike') {
         if (room.winner) return writeJson(res, 400, { error: 'Match already finished' });
         if (getRoomPhase(room) !== 'active') return writeJson(res, 400, { error: 'Match not active' });
-        if (!hasResearch(p, 'nuclear_technology', room.year)) return writeJson(res, 400, { error: 'Nuclear Technology offline' });
+        if (!hasResearch(p, 'nuclear_technology', room.year, room.ticks)) return writeJson(res, 400, { error: 'Nuclear Technology offline' });
         const opponent = room.players[room.playerOrder.find((id) => id !== playerId)];
         if (!opponent) return writeJson(res, 400, { error: 'Opponent not connected' });
         resolveNuclearStrike(room, p, opponent);
