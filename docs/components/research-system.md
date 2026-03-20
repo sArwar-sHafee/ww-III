@@ -6,9 +6,10 @@ Unlock new buildings, units, and war actions through sequential techs.
 ## Core Rules
 - Only one active research at a time per player.
 - Research costs are paid immediately on start.
-- A successful Research Center hit cancels the active research, disables that tech for half of its total duration, and forces it to restart from zero later.
-- Completed techs are not disabled by Research Center attacks.
-- Successful Research Center hits also block starting any new research for 2 years.
+- A successful Research Center hit destroys the active research progress, so the player must pay and start it from zero again later.
+- If there is active research, the hit also destroys 1 completed research; otherwise it destroys 2 completed researches.
+- Successful Research Center hits block starting any new research for 2 years.
+- Completed researches are removed from the end of the completed list first (most recently finished research is lost first).
 - The system uses month-based durations even though the field name is `years` in code.
 
 ## Research Data
