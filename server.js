@@ -37,6 +37,17 @@ const STARTING_POPULATION = 10;
 const STARTING_POPULATION_MAX = 10;
 const STARTING_CREDITS = 0;
 const POPULATION_NUTRITION_PER_YEAR = 0.25;
+const INTEL_EMOJIS = {
+  people: '👥',
+  economy: '💹',
+  buildings: '🏗️',
+  research_center: '🔬',
+  nutrition: '🍲', lumber: '🪵', steel: '🔩', copper: '🥉', alloy: '🪙', oil: '🛢️', magnet: '🧲', electricity: '⚡', glass: '🪟', polymer: '♻️', concrete: '🧱', silicon: '💾', uranium: '☢️',
+  farm: '🌾', lumber_camp: '🪓', steel_mill: '🏭', copper_mine: '🥉', alloy_quarry: '⛏️', oil_rig: '🛢️', magnet_extractor: '🧲', power_plant: '⚡', glassworks: '🪟', polymer_plant: '🧪', concrete_plant: '🧱', silicon_refinery: '🖥️', uranium_mine: '☢️',
+  shelter: '🏠', barracks: '🏕️', factory: '🏭', radar_station: '📡', dry_dock: '⚓', airfield: '🛫',
+  anti_missile_battery: '🛡️', land_mine: '💣',
+  infantry: '🪖', special_force: '🎖️', tank: '🛞', war_ship: '🚢', submarine: '🚤', fighter_zed: '🛩️', attack_helicopter: '🚁', combat_drone: '🤖', ballistic_missile: '🚀', cruise_missile: '☄️', scout_drone: '🛰️', anti_tank_squad: '🧨', naval_strike_missile: '🧿', air_defence_gun: '🎯', border_guard: '🛂'
+};
 
 const BUILDINGS = {
   farm: { name: 'Farm', cost: { lumber: 15, steel: 10 }, buildTime: 2, capacity: { nutrition: 200 }, production: { nutrition: 4 }, category: 'economy' },
@@ -790,7 +801,14 @@ function removeBuildings(player, ids, amount, priority = null) {
 function summarizeCountMap(losses, labelSource) {
   return Object.entries(losses || {})
     .filter(([, count]) => count > 0)
-    .map(([id, count]) => `${labelSource[id]?.name || id}: -${count}`);
+    .map(([id, count]) => `${INTEL_EMOJIS[id] || ''} ${labelSource[id]?.name || id}: -${count}`.trim());
+}
+
+function formatIntelRoster(roster, labelSource = { ...UNITS, ...BUILDINGS }) {
+  return Object.entries(roster || {})
+    .filter(([, count]) => count > 0)
+    .map(([id, count]) => `${INTEL_EMOJIS[id] || ''}${labelSource[id]?.name || id} x${count}`.trim())
+    .join(', ');
 }
 
 function applyEconomyImpact(attacker, defender, { buildingLosses = 0, resourcePct = 0, lootPct = 0 }) {
@@ -804,7 +822,7 @@ function applyEconomyImpact(attacker, defender, { buildingLosses = 0, resourcePc
       if (amount <= 0) continue;
       defender.resources[resource] -= amount;
       attacker.resources[resource] += amount;
-      details.push(`Looted ${amount} ${resource}`);
+      details.push(`${INTEL_EMOJIS[resource] || ''} Looted ${amount} ${resource}`.trim());
     }
   } else if (resourcePct > 0) {
     const targets = [...RESOURCE_KEYS]
@@ -815,7 +833,7 @@ function applyEconomyImpact(attacker, defender, { buildingLosses = 0, resourcePc
       const amount = Math.floor(defender.resources[resource] * resourcePct);
       if (amount <= 0) continue;
       defender.resources[resource] -= amount;
-      details.push(`${resource}: -${amount}`);
+      details.push(`${INTEL_EMOJIS[resource] || ''} ${resource}: -${amount}`.trim());
     }
   }
 
@@ -828,7 +846,7 @@ function applyBuildingsImpact(defender, { buildingLosses = 0, populationLoss = 0
   details.push(...summarizeCountMap(losses, BUILDINGS));
   if (populationLoss > 0) {
     defender.population = Math.max(0, defender.population - populationLoss);
-    details.push(`Population: -${populationLoss}`);
+    details.push(`👥 Population: -${populationLoss}`);
   }
   return details.length ? details : ['Buildings held under pressure.'];
 }
@@ -842,14 +860,14 @@ function applyResearchCenterImpact(room, defender, { delayMonths = 0, disableYea
     const untilTick = room.ticks + (disableMonths * TICKS_PER_MONTH);
     defender.research.active = null;
     defender.research.disabledUntilTick[techId] = Math.max(getResearchDisableTick(defender, techId), untilTick);
-    details.push(`${RESEARCH[techId]?.name || techId} canceled and disabled for ${disableMonths} months`);
+    details.push(`🔬 ${RESEARCH[techId]?.name || techId} canceled and disabled for ${disableMonths} months`);
   } else if (delayMonths > 0) {
-    details.push('No active research to cancel');
+    details.push('🔬 No active research to cancel');
   }
 
   if (disableYears > 0) {
     defender.researchLockUntil = Math.max(defender.researchLockUntil, room.year + 2);
-    details.push(`New research blocked until Year ${defender.researchLockUntil}`);
+    details.push(`🔒 New research blocked until Year ${defender.researchLockUntil}`);
   }
 
   return details.length ? details : ['Research Center stayed online.'];
@@ -882,7 +900,7 @@ function resolveNuclearStrike(room, player, opponent) {
 function formatDefenderAssignments(player, bucket) {
   return DEFENCE_ASSIGNABLE_IDS
     .filter((id) => (player.defenceAssignments?.[bucket]?.[id] || 0) > 0)
-    .map((id) => `${getEntityConfig(id)?.name || id} x${player.defenceAssignments[bucket][id]}`);
+    .map((id) => `${INTEL_EMOJIS[id] || ''} ${getEntityConfig(id)?.name || id} x${player.defenceAssignments[bucket][id]}`.trim());
 }
 
 function buildScoutReport(room, opponent, bucket) {
@@ -920,7 +938,7 @@ function applyBucketImpact(room, attacker, defender, bucket, impact) {
   if (extraLoss > 0 && defender.population > 0) {
     const actualLoss = Math.min(defender.population, extraLoss);
     defender.population -= actualLoss;
-    details.push(`Population: -${actualLoss} (attack casualties)`);
+    details.push(`👥 Population: -${actualLoss} (attack casualties)`);
   }
 
   return details;
@@ -1037,14 +1055,14 @@ function resolveMissileAction(room, player, opponent, action) {
         bucket,
         title: `${missile.name} intercepted`,
         summary: `${getBucketLabel(bucket)} held the incoming missile.`,
-        details: formatDefenderAssignments(opponent, bucket)
+        details: [`${INTEL_EMOJIS[action.missileId] || ''} Attacker launched ${missile.name} x1`.trim(), ...formatDefenderAssignments(opponent, bucket)]
       });
       appendIntel(opponent, room.year, {
         tone: 'error',
         bucket,
         title: `${missile.name} intercepted`,
         summary: `Assigned air defence stopped a strike on ${getBucketLabel(bucket)}.`,
-        details: formatDefenderAssignments(opponent, bucket)
+        details: [`${INTEL_EMOJIS[action.missileId] || ''} Incoming ${missile.name} x1 intercepted`.trim(), ...formatDefenderAssignments(opponent, bucket)]
       });
       setForcedIntelView(opponent, `${missile.name} intercepted over ${getBucketLabel(bucket)}`);
       continue;
@@ -1054,6 +1072,7 @@ function resolveMissileAction(room, player, opponent, action) {
     const attackModifier = getAttackImpactModifier(player, bucket, room.year);
     const scaledImpact = scaleBucketImpact(strike, effectiveness * attackModifier);
     const details = [
+      `${INTEL_EMOJIS[action.missileId] || ''} Attacker launched ${missile.name} x1`.trim(),
       describeAttackImpactModifier(attackModifier),
       ...applyBucketImpact(room, player, opponent, bucket, scaledImpact)
     ];
@@ -1113,9 +1132,24 @@ function resolveAssaultAction(room, player, opponent, action) {
   rebalanceDefenceAssignments(opponent);
 
   const battleDetails = [
-    ...summarizeCountMap(battle.attackerLosses, { ...UNITS, ...BUILDINGS }).map((line) => `Attacker ${line}`),
-    ...summarizeCountMap(battle.defenderLosses, { ...UNITS, ...BUILDINGS }).map((line) => `Defender ${line}`)
-  ];
+    formatIntelRoster(committed) ? `⚔️ Attackers committed: ${formatIntelRoster(committed)}` : '',
+    formatIntelRoster(battle.attackersRemaining) ? `🛡️ Attackers survived: ${formatIntelRoster(battle.attackersRemaining)}` : '',
+    ...summarizeCountMap(battle.attackerLosses, { ...UNITS, ...BUILDINGS }).map((line) => `⚰️ Attacker lost ${line}`),
+    ...summarizeCountMap(battle.defenderLosses, { ...UNITS, ...BUILDINGS }).map((line) => `💥 Defender lost ${line}`)
+  ].filter(Boolean);
+
+  const impactLabel = bucket === 'economy'
+    ? '💹 Economy damage'
+    : bucket === 'buildings'
+      ? '🏗️ Buildings damage'
+      : '🔬 Research Center damage';
+
+  const battleSummary = battle.defenderLosses && Object.keys(battle.defenderLosses).length
+    ? 'Committed forces broke through the assigned defence and destroyed some defenders.'
+    : 'Committed forces broke through the assigned defence.';
+  const defenceSummary = battle.defenderLosses && Object.keys(battle.defenderLosses).length
+    ? 'Assigned defence was overrun and some defenders were destroyed.'
+    : 'Assigned defence was overrun.';
 
   if (battle.attackerWon) {
     const survivorScore = Math.max(1, Math.ceil(getCombatScore(battle.attackersRemaining) / 120));
@@ -1128,6 +1162,7 @@ function resolveAssaultAction(room, player, opponent, action) {
     const impact = scaleBucketImpact(baseImpact, attackModifier);
     const impactDetails = [
       describeAttackImpactModifier(attackModifier),
+      impactLabel,
       ...applyBucketImpact(room, player, opponent, bucket, impact)
     ];
     appendEvent(player, room.year, `⚔️ Assault breached ${getBucketLabel(bucket)}`);
@@ -1136,14 +1171,14 @@ function resolveAssaultAction(room, player, opponent, action) {
       tone: 'error',
       bucket,
       title: `${getBucketLabel(bucket)} assault won`,
-      summary: 'Committed forces broke through the assigned defence.',
+      summary: battleSummary,
       details: [...battleDetails, ...impactDetails]
     });
     appendIntel(opponent, room.year, {
       tone: 'error',
       bucket,
       title: `${getBucketLabel(bucket)} assault loss`,
-      summary: 'Assigned defence was overrun.',
+      summary: defenceSummary,
       details: [...battleDetails, ...impactDetails]
     });
     setForcedIntelView(opponent, `${getBucketLabel(bucket)} breached`);

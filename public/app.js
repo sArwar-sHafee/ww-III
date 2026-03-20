@@ -79,6 +79,7 @@ const DOC_FILES = [
   'docs/economy/production.md',
   'docs/economy/resources.md',
   'docs/rules/victory-conditions.md',
+  'docs/rules/attack-impact-calculation.md',
   'docs/rules/war-condition.md',
   'docs/rules/war-room.md',
   'docs/ui/emoji-map.md'
