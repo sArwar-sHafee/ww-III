@@ -5,7 +5,7 @@ const state = {
   reconnectToken: null,
   meta: null,
   game: null,
-  tab: 'economy',
+  tab: 'dashboard',
   lastStateAt: 0,
   pollTimer: null,
   es: null,
@@ -43,8 +43,9 @@ const emojis = {
   anti_missile_battery: '🛡️', land_mine: '💣',
   infantry: '🪖', special_force: '🎖️', tank: '🛞', war_ship: '🚢', submarine: '🚤', fighter_zed: '🛩️', attack_helicopter: '🚁', combat_drone: '🤖', ballistic_missile: '🚀', cruise_missile: '☄️', scout_drone: '🛰️', anti_tank_squad: '🧨', naval_strike_missile: '🧿', air_defence_gun: '🎯', border_guard: '🛂'
 };
-const tabs = ['economy', 'supports', 'trade', 'research', 'defences', 'military', 'defence_room', 'war_room', 'opponent_intel', 'help'];
+const tabs = ['dashboard', 'economy', 'supports', 'trade', 'research', 'defences', 'military', 'defence_room', 'war_room', 'opponent_intel', 'help'];
 const tabLabels = {
+  dashboard: 'Dashboard',
   economy: 'Economy',
   supports: 'Construction',
   trade: 'Trade',
@@ -1532,6 +1533,7 @@ function renderWarRoom() {
 function renderTab(options = {}) {
   if (!state.game?.you) return;
   const renderActiveTab = () => {
+    if (state.tab === 'dashboard') return renderDashboard();
     if (state.tab === 'economy' || state.tab === 'supports') return renderEconomyOrSupports();
     if (state.tab === 'trade') return renderTrade();
     if (state.tab === 'military') return renderMilitary();
