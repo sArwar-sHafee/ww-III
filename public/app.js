@@ -833,8 +833,22 @@ function getUnitDraft(id) {
   return Math.max(1, Number(state.unitDrafts[id] || 1));
 }
 
+function getPendingMissileCount(id) {
+  return (state.game?.you?.pending || [])
+    .filter((action) => action.type === 'missile' && action.missileId === id)
+    .reduce((sum, action) => sum + Math.max(1, Math.floor(Number(action.amount || 1))), 0);
+}
+
+function getAvailableMissileStock(id = state.selectedMissile) {
+  if (!id || !state.game?.you) return 0;
+  return Math.max(0, (state.game.you.units?.[id] || 0) - getPendingMissileCount(id));
+}
+
 function getMissileDraft() {
-  return Math.max(1, Number(state.missileDraft || 1));
+  const available = getAvailableMissileStock(state.selectedMissile);
+  const raw = Math.max(0, Math.floor(Number(state.missileDraft || 1)));
+  if (available <= 0) return 0;
+  return Math.min(available, Math.max(1, raw));
 }
 
 function adjustUnitDraft(id, delta) {
@@ -844,7 +858,9 @@ function adjustUnitDraft(id, delta) {
 }
 
 function adjustMissileDraft(delta) {
-  state.missileDraft = Math.max(1, getMissileDraft() + delta);
+  const available = getAvailableMissileStock(state.selectedMissile);
+  const next = getMissileDraft() + delta;
+  state.missileDraft = available <= 0 ? 0 : Math.min(available, Math.max(1, next));
   state.forceTabRefresh = true;
   renderAll();
 }
@@ -905,7 +921,9 @@ function techLabel(id) {
 function hasTechOnline(id) {
   if (!state.game?.you) return false;
   const disabledUntil = state.game.you.research?.disabledUntil?.[id] || -1;
-  return state.game.you.research?.completed?.includes(id) && state.game.year >= disabledUntil;
+  return state.game.you.research?.completed?.includes(id)
+    && state.game.year >= disabledUntil
+    && getResearchDisabledMonthsRemaining(id) <= 0;
 }
 
 function getMissingCost(cost, amount = 1) {
@@ -919,6 +937,18 @@ function upkeepLine(entity) {
   if (!entity?.upkeep) return '';
   const entries = Object.entries(entity.upkeep).map(([key, value]) => `${emojis[key] || ''}${key}: -${value}/year`);
   return entries.length ? `Upkeep: ${entries.join(', ')}` : '';
+}
+
+function battlePointLine(entity) {
+  return entity?.combatWeight ? `Battle Point: ${entity.combatWeight}` : '';
+}
+
+function getResearchDisabledMonthsRemaining(id) {
+  const untilTick = state.game?.you?.research?.disabledUntilTick?.[id] || -1;
+  const currentTick = state.game?.ticks || 0;
+  const remainingTicks = Math.max(0, untilTick - currentTick);
+  if (remainingTicks <= 0) return 0;
+  return Math.ceil(remainingTicks / (state.meta?.ticksPerMonth || 5));
 }
 
 function getBuildCardState(id) {
@@ -951,15 +981,17 @@ function getResearchCardState(id) {
   const tech = state.meta.research[id];
   const reasons = [];
   const isCurrent = you.research.active?.id === id;
+  const disabledMonths = getResearchDisabledMonthsRemaining(id);
   if (state.game.phase !== 'active') reasons.push('Match not active');
   if (state.game.year < (you.researchLockUntil || -1)) reasons.push(`Research locked until Year ${you.researchLockUntil}`);
   if (you.research.completed.includes(id)) reasons.push('Completed');
   if (you.research.active && !isCurrent) reasons.push('Research in progress');
+  if (disabledMonths > 0) reasons.push(`Disabled for ${disabledMonths} more months`);
   if (tech.minYear && state.game.year < tech.minYear) reasons.push(`Available Year ${tech.minYear}`);
   if (tech.prereq && !hasTechOnline(tech.prereq)) reasons.push(`Needs ${techLabel(tech.prereq)}`);
   const missing = getMissingCost(tech.cost);
   if (missing.length && !isCurrent) reasons.push(`Missing ${missing.join(', ')}`);
-  return { disabled: reasons.length > 0, reasons, isCurrent };
+  return { disabled: reasons.length > 0, reasons, isCurrent, disabledMonths };
 }
 
 function getQuickActionState(type, missileId = state.selectedMissile, amount = getMissileDraft()) {
@@ -972,9 +1004,11 @@ function getQuickActionState(type, missileId = state.selectedMissile, amount = g
   }
   if (type === 'missile') {
     const missile = state.meta.units[missileId];
+    const available = getAvailableMissileStock(missileId);
     if (!hasTechOnline('missile_silo')) reasons.push('Missile Silo offline');
     if (!missile?.missile) reasons.push('Choose a missile type');
-    if ((you.units[missileId] || 0) < amount) reasons.push(`Need ${amount} ${missile?.name || 'missile stock'}`);
+    if (available <= 0) reasons.push(`Need ${missile?.name || 'missile stock'}`);
+    if (amount > available) reasons.push(`Need ${amount} ${missile?.name || 'missile stock'}`);
   }
   if (type === 'nuclear') {
     if (!hasTechOnline('nuclear_technology')) reasons.push('Nuclear Technology offline');
@@ -1084,6 +1118,7 @@ function renderMilitary() {
     return `<div class="card">
       <b>${emojis[id] || ''} ${unit.name}</b>
       <div class="small">Owned: ${you.units[id]}${unit.assault ? ` | Free for assault: ${attackAvailable}` : ''}</div>
+      ${battlePointLine(unit) ? `<div class="small">${battlePointLine(unit)}</div>` : ''}
       <div class="small">Cost: ${costLine(unit.cost)}</div>
       ${upkeepLine(unit) ? `<div class="small">${upkeepLine(unit)}</div>` : ''}
       ${unit.missile ? `<div class="small">Missile payload</div>` : ''}
@@ -1114,6 +1149,7 @@ function renderDefences() {
     return `<div class="card">
       <b>${emojis[id] || ''} ${building.name}</b>
       <div class="small">Owned: ${you.buildings[id]} | Build time: ${building.buildTime} months</div>
+      ${battlePointLine(building) ? `<div class="small">${battlePointLine(building)}</div>` : ''}
       <div class="small">Cost: ${costLine(building.cost)}</div>
       ${upkeepLine(building) ? `<div class="small">${upkeepLine(building)}</div>` : ''}
       ${getCombatCapabilityLine(building, 'Can destroy') ? `<div class="small">${getCombatCapabilityLine(building, 'Can destroy')}</div>` : ''}
@@ -1128,6 +1164,7 @@ function renderDefences() {
     return `<div class="card">
       <b>${emojis[id] || ''} ${unit.name}</b>
       <div class="small">Owned: ${you.units[id]}</div>
+      ${battlePointLine(unit) ? `<div class="small">${battlePointLine(unit)}</div>` : ''}
       <div class="small">Cost: ${costLine(unit.cost)}</div>
       ${upkeepLine(unit) ? `<div class="small">${upkeepLine(unit)}</div>` : ''}
       ${getCombatCapabilityLine(unit, 'Can destroy') ? `<div class="small">${getCombatCapabilityLine(unit, 'Can destroy')}</div>` : ''}
@@ -1446,13 +1483,12 @@ function renderResearch() {
     Object.entries(state.meta.research).map(([id, tech]) => {
       const cardState = getResearchCardState(id);
       const progress = cardState.isCurrent ? Math.max(0, 100 - Math.floor((you.research.active.ticksRemaining / (tech.years * (state.meta?.ticksPerMonth || 5))) * 100)) : (you.research.completed.includes(id) ? 100 : 0);
-      const disabledUntil = you.research.disabledUntil?.[id];
       const label = cardState.isCurrent ? `Researching... ${progress}%` : 'Start';
       return `<div class="card">
         <b>${tech.name}</b>
         <div class="small">Cost: ${costLine(tech.cost)} | 🕒 ${tech.years} months</div>
         <div class="small">Progress: ${progress}%</div>
-        ${disabledUntil > state.game.year ? `<div class="small warning">Disabled until Year ${disabledUntil}</div>` : ''}
+        ${cardState.disabledMonths > 0 ? `<div class="small warning">Disabled for ${cardState.disabledMonths} more months</div>` : ''}
         <div class="progress"><span style="width:${progress}%"></span></div>
         ${renderReasons(cardState.reasons)}
         ${actionBtn(label, () => sendAction('research', { id }), { disabled: cardState.disabled, title: cardState.reasons.join(' | ') })}
@@ -1461,9 +1497,11 @@ function renderResearch() {
 }
 
 function renderWarRoom() {
+  state.missileDraft = getMissileDraft();
   const scoutState = getQuickActionState('scout');
   const missileState = getQuickActionState('missile', state.selectedMissile, getMissileDraft());
   const nuclearState = getQuickActionState('nuclear');
+  const missileAvailable = getAvailableMissileStock(state.selectedMissile);
   const assaultRows = getAssaultUnits().map(([id, unit]) => {
     updateWarRoomDraft(id, state.warRoomDraft[id] || 0);
     const freeCount = getAttackAvailableCount(id);
@@ -1497,9 +1535,9 @@ function renderWarRoom() {
       </div>
       <div class="row stepper">
         ${actionBtn('-', () => adjustMissileDraft(-1), { disabled: getMissileDraft() <= 1 })}
-        <input id="wrMissileAmt" type="number" value="${getMissileDraft()}" min="1" readonly />
-        ${actionBtn('+', () => adjustMissileDraft(1))}
-        <span class="small">Missiles per launch</span>
+        <input id="wrMissileAmt" type="number" value="${getMissileDraft()}" min="0" readonly />
+        ${actionBtn('+', () => adjustMissileDraft(1), { disabled: missileAvailable <= 0 || getMissileDraft() >= missileAvailable, title: missileAvailable <= 0 ? 'No missile stock available' : (getMissileDraft() >= missileAvailable ? 'Reached available stock' : '') })}
+        <span class="small">Missiles per launch | Available ${missileAvailable}</span>
       </div>
       ${renderReasons(nuclearState.reasons)}
       <div class="row">
@@ -1522,6 +1560,7 @@ function renderWarRoom() {
     </div>`;
   document.getElementById('wrMissile')?.addEventListener('change', (event) => {
     state.selectedMissile = event.target.value;
+    state.missileDraft = getMissileDraft();
     state.forceTabRefresh = true;
     renderAll();
   });

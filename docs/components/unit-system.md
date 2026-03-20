@@ -12,7 +12,7 @@ Train units, apply upkeep, and expose combat stats for war resolution.
 ## Unit Data
 All upkeep values are per year and are scaled each tick.
 
-| Id | Name | Section | Cost | Upkeep | Attack | Defense | Combat Weight | Requires | Flags |
+| Id | Name | Section | Cost | Upkeep | Attack | Defense | Battle Point | Requires | Flags |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `infantry` | Infantry | military | nutrition 6, steel 4 | nutrition 0.15 | 10 | 5 | 10 | `barracks` | assault |
 | `special_force` | Special Force | military | nutrition 8, steel 8, electricity 2, polymer 2 | nutrition 0.25, electricity 0.1 | 22 | 14 | 22 | `barracks`, `advanced_scouting` | assault |
@@ -25,7 +25,7 @@ All upkeep values are per year and are scaled each tick.
 | `ballistic_missile` | Ballistic Missile | military | steel 20, alloy 20, oil 12, copper 8, uranium 3 | - | 160 | - | 160 | `missile_silo` | missile |
 | `cruise_missile` | Cruise Missile | military | steel 14, alloy 12, oil 10, copper 4, polymer 5 | - | 110 | - | 110 | `missile_silo` | missile |
 | `scout_drone` | Scout Drone | military | oil 5, electricity 3, copper 2, glass 2 | electricity 0.08 | - | - | - | `radar_station` | utility |
-| `anti_tank_squad` | Anti-Tank Squad | defence | nutrition 10, steel 12, polymer 6 | nutrition 0.15 | - | 18 | 18 | `barracks`, `tanks` | defence-assignable |
-| `naval_strike_missile` | Naval Strike Missile | defence | steel 30, alloy 24, oil 16, copper 8 | - | - | 45 | 45 | `dry_dock`, `guided_missiles` | defence-assignable |
-| `air_defence_gun` | Air Defence Gun | defence | steel 26, alloy 14, electricity 10, copper 10 | electricity 0.08, copper 0.05 | - | 28 | 28 | `airfield`, `guided_missiles` | defence-assignable |
-| `border_guard` | Border Guard | defence | nutrition 10, polymer 6 | nutrition 0.15 | - | 12 | 12 | `barracks` | defence-assignable |
+| `anti_tank_squad` | Anti-Tank Squad | defence | nutrition 10, steel 12, polymer 6 | nutrition 0.15 | - | 18 | 12 | `barracks`, `tanks` | defence-assignable |
+| `naval_strike_missile` | Naval Strike Missile | defence | steel 30, alloy 24, oil 16, copper 8 | - | - | 45 | 30 | `dry_dock`, `guided_missiles` | defence-assignable |
+| `air_defence_gun` | Air Defence Gun | defence | steel 26, alloy 14, electricity 10, copper 10 | electricity 0.08, copper 0.05 | - | 28 | 19 | `airfield`, `guided_missiles` | defence-assignable |
+| `border_guard` | Border Guard | defence | nutrition 10, polymer 6 | nutrition 0.15 | - | 12 | 8 | `barracks` | defence-assignable |

@@ -14,5 +14,5 @@ Provide temporary opponent intel and influence strike efficiency.
 ## Intel Content
 - Economy: exact counts of economy buildings and floored resource totals.
 - Buildings: exact counts of support buildings.
-- Research Center: active research status, lock status, and completed techs with disabled state.
+- Research Center: active research status, research lock status, completed techs, and any temporarily disabled research with remaining months.
 - Assigned defenders for that bucket are shown if any.
