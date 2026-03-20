@@ -501,6 +501,7 @@ function getDestroyedByLine(unitId) {
 function getResourceConsumptionDetails(resource) {
   const you = state.game?.you;
   if (!you) return [];
+  if (resource === 'credits') return [];
   const rows = [];
   if (resource === 'nutrition' && you.population > 0) rows.push(`${emojis.people} ${formatSigned(-you.population * POPULATION_NUTRITION_PER_YEAR)}`);
   for (const [id, building] of Object.entries(state.meta?.buildings || {})) {
@@ -519,6 +520,7 @@ function getResourceConsumptionDetails(resource) {
 function getResourceGenerationDetails(resource) {
   const you = state.game?.you;
   if (!you) return [];
+  if (resource === 'credits') return [];
   const rows = [];
   for (const [id, building] of Object.entries(state.meta?.buildings || {})) {
     const count = you.buildings?.[id] || 0;
@@ -529,6 +531,13 @@ function getResourceGenerationDetails(resource) {
 }
 
 function getResourceTradeDetails(resource) {
+  if (resource === 'credits') {
+    const { earned, spent } = getCreditsTradeFlow();
+    const parts = [];
+    if (earned > 0) parts.push(`+${earned}/yr`);
+    if (spent > 0) parts.push(`-${spent}/yr`);
+    return parts.length ? parts.join(', ') : 'None';
+  }
   const auto = state.game?.you?.autoTrades?.[resource];
   if (!auto) return 'None';
   const signed = auto.mode === 'buy' ? `+${auto.amount}` : `-${auto.amount}`;
@@ -536,12 +545,18 @@ function getResourceTradeDetails(resource) {
 }
 
 function getResourceTradeDelta(resource) {
+  if (resource === 'credits') return getCreditsNetPerYear();
   const auto = state.game?.you?.autoTrades?.[resource];
   if (!auto) return 0;
   return auto.mode === 'buy' ? auto.amount : -auto.amount;
 }
 
 function getResourceDetailTooltip(resource) {
+  if (resource === 'credits') {
+    const earned = state.game?.you?.population || 0;
+    const trade = getResourceTradeDetails('credits');
+    return [`Earnings: +${earned}/yr`, `Trade: ${trade}`].join('\n');
+  }
   const generation = getResourceGenerationDetails(resource);
   const consumption = getResourceConsumptionDetails(resource);
   const trade = getResourceTradeDetails(resource);
@@ -556,6 +571,17 @@ function getResourceDetailTooltip(resource) {
 }
 
 function getResourceDetailHtml(resource) {
+  if (resource === 'credits') {
+    const earned = state.game?.you?.population || 0;
+    const trade = getResourceTradeDetails('credits');
+    return `
+      <div class="resource-detail-block">
+        <div class="small"><b>${emojis.credits} credits</b></div>
+        <div class="small">Earnings: +${earned}/yr</div>
+        <div class="small">Trade: ${trade}</div>
+      </div>
+    `;
+  }
   const generation = getResourceGenerationDetails(resource);
   const consumption = getResourceConsumptionDetails(resource);
   const trade = getResourceTradeDetails(resource);
@@ -597,6 +623,23 @@ function getCreditsNetPerYear() {
     else net += getTradeSellReturn(resource, trade.amount, true);
   }
   return Math.floor(net);
+}
+
+function getCreditsTradeFlow() {
+  const you = state.game?.you;
+  if (!you) return { earned: 0, spent: 0 };
+  let earned = 0;
+  let spent = 0;
+  for (const resource of state.meta?.resources || []) {
+    const trade = you.autoTrades?.[resource];
+    if (!trade) continue;
+    if (trade.mode === 'buy') {
+      spent += getTradeBuyCost(resource, trade.amount, true);
+    } else {
+      earned += getTradeSellReturn(resource, trade.amount, true);
+    }
+  }
+  return { earned: Math.floor(earned), spent: Math.floor(spent) };
 }
 
 function formatCreditsNetPerYear() {
@@ -1242,6 +1285,13 @@ function renderHelp() {
 
 function renderSidebar() {
   const you = state.game.you;
+  const creditsRow = (() => {
+    const value = Math.floor(you.credits || 0);
+    const net = getCreditsNetPerYear();
+    const cls = getResourceStateClass(value, net);
+    const tooltip = escapeAttr(getResourceDetailTooltip('credits'));
+    return `<tr class="${cls} resource-row" data-resource-row="credits" title="${tooltip}"><td title="${tooltip}">${emojis.credits} credits</td><td>${value}</td><td>${formatDelta(net)}</td></tr>`;
+  })();
   const resourceRows = state.meta.resources.map((resource) => {
     const value = Math.floor(you.resources[resource]);
     const net = (you.net?.[resource] ?? 0) + getResourceTradeDelta(resource);
@@ -1271,15 +1321,14 @@ function renderSidebar() {
     sidebarContentEl.innerHTML = `
       <h3>Command Summary</h3>
       <div class="small">📅 Year ${state.game.year}, Month ${state.game.month}</div>
-      <div class="small" id="sidebarCountdown">⏱️ Tick ${getSidebarCountdownLabel()}</div>
       <div class="small">👥 Population ${you.population}/${you.populationMax}</div>
-      <div class="small">💳 Credits ${you.credits} ${formatCreditsNetPerYear()}</div>
+      <div class="small" id="sidebarCountdown">⏱️ Tick ${getSidebarCountdownLabel()}</div>
       <div class="split-panels">
         <div class="panel inset">
           <h3>Resources</h3>
           <table class="data-table">
             <thead><tr><th>Resource</th><th>Total</th><th>Net</th></tr></thead>
-            <tbody>${resourceRows}</tbody>
+            <tbody>${creditsRow}${resourceRows}</tbody>
           </table>
         </div>
         <div class="panel inset">
