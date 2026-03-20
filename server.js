@@ -1263,8 +1263,7 @@ function resolveTick(room) {
         p.population -= starvationLoss;
         appendEvent(p, room.year, `☠️ Population starvation: -${starvationLoss}`);
       }
-      const surplus = p.resources.nutrition - p.population * 10;
-      if (surplus > 10 && p.population < p.populationMax) {
+      if (p.population < p.populationMax) {
         const growth = Math.max(1, Math.floor(0.1 * p.population));
         if (growth > 0) {
           p.population = Math.min(p.populationMax, p.population + growth);

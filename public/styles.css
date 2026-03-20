@@ -243,13 +243,6 @@ button:disabled {
   font-weight: 600;
 }
 
-.resource-row {
-  cursor: pointer;
-}
-
-.resource-row:hover {
-  background: rgba(0, 229, 255, 0.08);
-}
 
 .card {
   background: #1c1f24;
