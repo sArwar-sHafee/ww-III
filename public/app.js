@@ -59,9 +59,6 @@ const tabLabels = {
 
 const SOURCE_CODE_URL = 'https://github.com/sArwar-sHafee/ww-III';
 const DOC_FILES = [
-  'Readme.md',
-  'docs/README.md',
-  'summary.md',
   'docs/architecture/system-overview.md',
   'docs/components/building-system.md',
   'docs/components/combat-system.md',
@@ -1269,15 +1266,24 @@ function renderOpponentIntel() {
 }
 
 function renderHelp() {
-  const docLinks = DOC_FILES.map((path) => `
-    <li><a href="${SOURCE_CODE_URL}/blob/main/${path}" target="_blank" rel="noreferrer">${path}</a></li>
-  `).join('');
+  const docLinks = DOC_FILES.map((path) => {
+    const label = path.split('/').pop()?.replace(/\.md$/i, '') || path;
+    const title = label.split('-').map((part) => {
+      if (!part) return part;
+      const lower = part.toLowerCase();
+      if (['ui', 'api', 'sse', 'id'].includes(lower)) return lower.toUpperCase();
+      return part[0].toUpperCase() + part.slice(1);
+    }).join(' ');
+    const pagePath = path.replace(/^docs\//, '').replace(/\.md$/i, '.html');
+    const url = `https://sarwar-shafee.github.io/ww-III/${pagePath}`;
+    return `<li><b>${title}</b> ${url}</li>`;
+  }).join('');
   tabContent.innerHTML = `
     <h3>Help</h3>
     <div class="panel inset">
-      <div class="help-title">Gameplay</div>
-      <div class="small"><a href="${SOURCE_CODE_URL}" target="_blank" rel="noreferrer">Source Code</a></div>
       ${state.selectedResource ? getResourceDetailHtml(state.selectedResource) : ''}
+      <div class="help-title">Gameplay</div>
+      <div class="small"><b>Source code</b> ${SOURCE_CODE_URL}</div>
       <ul class="doc-links">${docLinks}</ul>
     </div>
   `;
