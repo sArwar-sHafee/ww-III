@@ -284,6 +284,16 @@ button:disabled {
   display: inline-block;
   font-size: 0.78rem;
   color: var(--text-dim);
+  text-decoration: underline;
+}
+
+.doc-url:hover,
+.doc-url:focus-visible {
+  color: var(--accent);
+}
+
+.source-code-link {
+  overflow-wrap: anywhere;
 }
 
 
