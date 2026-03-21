@@ -34,5 +34,3 @@ All build times are in months. Production and upkeep values are per year and are
 | `radar_station` | Radar Station | support | steel 20, alloy 12, magnet 10, copper 12, glass 8 | 2 | - | - | - | - | `advanced_scouting` |
 | `dry_dock` | Dry Dock | support | lumber 45, steel 35, concrete 25, polymer 10 | 3 | - | - | - | - | - |
 | `airfield` | Airfield | support | steel 55, alloy 30, concrete 40, glass 15, copper 18 | 3 | - | - | - | - | - |
-| `anti_missile_battery` | Anti-Missile Battery | military | steel 45, oil 20, magnet 18, copper 18 | 2 | - | - | - | 16 | `guided_missiles` |
-| `land_mine` | Land Mine | military | lumber 60, steel 40, polymer 16 | 2 | - | - | - | 12 | - |

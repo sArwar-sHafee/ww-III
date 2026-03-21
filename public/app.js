@@ -936,8 +936,12 @@ function getMissingCost(cost, amount = 1) {
 
 function upkeepLine(entity) {
   if (!entity?.upkeep) return '';
-  const entries = Object.entries(entity.upkeep).map(([key, value]) => `${emojis[key] || ''}${key}: -${value}/year`);
+  const entries = Object.entries(entity.upkeep).map(([key, value]) => `${emojis[key] || ''}${key}: -${value}/yr`);
   return entries.length ? `Upkeep: ${entries.join(', ')}` : '';
+}
+
+function getUnitActionLabel(unit) {
+  return unit?.buildLabel || 'Train';
 }
 
 function battlePointLine(entity) {
@@ -1132,6 +1136,7 @@ function renderMilitary() {
     const unitState = getUnitCardState(id);
     const attackAvailable = getAttackAvailableCount(id);
     const destroyedBy = getDestroyedByLine(id);
+    const actionLabel = getUnitActionLabel(unit);
     return `<div class="card">
       <b>${emojis[id] || ''} ${unit.name}</b>
       <div class="small">Owned: ${you.units[id]}${unit.assault ? ` | Free for assault: ${attackAvailable}` : ''}</div>
@@ -1145,7 +1150,7 @@ function renderMilitary() {
         ${actionBtn('-', () => adjustUnitDraft(id, -1))}
         <input id="amt_${id}" value="${getUnitDraft(id)}" type="number" min="1" readonly />
         ${actionBtn('+', () => adjustUnitDraft(id, 1))}
-        ${actionBtn('Train', () => sendAction('train', { id, amount: getUnitDraft(id) }), { disabled: unitState.disabled, title: unitState.reasons.join(' | ') })}
+        ${actionBtn(actionLabel, () => sendAction('train', { id, amount: getUnitDraft(id) }), { disabled: unitState.disabled, title: unitState.reasons.join(' | ') })}
       </div>
     </div>`;
   }).join('');
@@ -1159,25 +1164,9 @@ function renderMilitary() {
 
 function renderDefences() {
   const you = state.game.you;
-  const defenceBuildings = ['anti_missile_battery', 'land_mine'].map((id) => {
-    const building = state.meta.buildings[id];
-    const cardState = getBuildCardState(id);
-    const label = cardState.inQueue ? `Building... (${ticksToMonths(cardState.inQueue.ticksRemaining)} months)` : 'Build';
-    return `<div class="card">
-      <b>${emojis[id] || ''} ${building.name}</b>
-      <div class="small">Owned: ${you.buildings[id]} | Build time: ${building.buildTime} months</div>
-      ${battlePointLine(building) ? `<div class="small">${battlePointLine(building)}</div>` : ''}
-      <div class="small">Cost: ${costLine(building.cost)}</div>
-      ${upkeepLine(building) ? `<div class="small">${upkeepLine(building)}</div>` : ''}
-      ${getCombatCapabilityLine(building, 'Can destroy') ? `<div class="small">${getCombatCapabilityLine(building, 'Can destroy')}</div>` : ''}
-      ${productionLine(building) ? `<div class="small">Output: ${productionLine(building)}</div>` : ''}
-      ${renderReasons(cardState.reasons)}
-      ${actionBtn(label, () => sendAction('build', { id }), { disabled: cardState.disabled, title: cardState.reasons.join(' | ') })}
-    </div>`;
-  }).join('');
-
   const defenceUnits = getDefenceUnits().map(([id, unit]) => {
     const unitState = getUnitCardState(id);
+    const actionLabel = getUnitActionLabel(unit);
     return `<div class="card">
       <b>${emojis[id] || ''} ${unit.name}</b>
       <div class="small">Owned: ${you.units[id]}</div>
@@ -1190,7 +1179,7 @@ function renderDefences() {
         ${actionBtn('-', () => adjustUnitDraft(id, -1))}
         <input id="amt_${id}" value="${getUnitDraft(id)}" type="number" min="1" readonly />
         ${actionBtn('+', () => adjustUnitDraft(id, 1))}
-        ${actionBtn('Train', () => sendAction('train', { id, amount: getUnitDraft(id) }), { disabled: unitState.disabled, title: unitState.reasons.join(' | ') })}
+        ${actionBtn(actionLabel, () => sendAction('train', { id, amount: getUnitDraft(id) }), { disabled: unitState.disabled, title: unitState.reasons.join(' | ') })}
       </div>
     </div>`;
   }).join('');
@@ -1198,7 +1187,7 @@ function renderDefences() {
   tabContent.innerHTML = `
     <div class="panel inset">
       <h3>Defence</h3>
-      <div class="action-grid">${defenceBuildings}${defenceUnits}</div>
+      <div class="action-grid">${defenceUnits}</div>
     </div>
   `;
 }
@@ -1281,8 +1270,7 @@ function renderDefenceAssignmentRows(bucket, entries) {
 }
 
 function renderDefenceRoom() {
-  const buildingEntries = getDefenceAssignableBuildings();
-  const unitEntries = getDefenceAssignableUnits();
+  const defenceEntries = [...getDefenceAssignableBuildings(), ...getDefenceAssignableUnits()];
   tabContent.innerHTML = `
     <h3>Guardrail</h3>
     <div class="small">Assign defence assets into Economy, Buildings, or Research Center. Only assigned defences will respond to attacks on that bucket.</div>
@@ -1292,12 +1280,8 @@ function renderDefenceRoom() {
           <h3>${getTargetIcon(bucket)} ${config.label}</h3>
           <div class="small">Only assets assigned here will fight when this bucket is attacked.</div>
           <div class="assignment-group">
-            <div class="small">Defence structures</div>
-            ${renderDefenceAssignmentRows(bucket, buildingEntries)}
-          </div>
-          <div class="assignment-group">
-            <div class="small">Defence units</div>
-            ${renderDefenceAssignmentRows(bucket, unitEntries)}
+            <div class="small">Defence assets</div>
+            ${renderDefenceAssignmentRows(bucket, defenceEntries)}
           </div>
         </div>
       `).join('')}
@@ -1400,7 +1384,6 @@ function renderSidebar() {
   `).join('');
 
   const defenceRows = [
-    ...['anti_missile_battery', 'land_mine'].map((id) => `<tr><td>${emojis[id] || ''} ${state.meta.buildings[id].name}</td><td>${you.buildings[id]}</td></tr>`),
     ...getDefenceUnits().map(([id, unit]) => `<tr><td>${emojis[id] || ''} ${unit.name}</td><td>${you.units[id]}</td></tr>`)
   ].join('');
 
