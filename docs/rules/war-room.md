@@ -14,7 +14,8 @@ All war actions target one of three buckets:
 ## Scouting
 - Requires a Scout Drone.
 - Cooldown: once per year.
-- Intel lasts 2 years for the chosen bucket.
+- Intel lasts 3 years for the chosen bucket.
+- Queue the scout before the attack if you want that same year-end attack to use the intel.
 - Active intel grants 100% strike efficiency; without intel, impact is scaled to 80%.
 
 ## Missile Strikes
