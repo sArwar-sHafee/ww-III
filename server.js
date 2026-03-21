@@ -416,6 +416,11 @@ function hasActiveScoutIntel(player, bucket, year) {
   return year < (player.scoutIntelUntil?.[bucket] ?? -1);
 }
 
+function getScoutIntelYearsRemaining(player, bucket, year) {
+  if (!isValidTargetBucket(bucket)) return 0;
+  return Math.max(0, (player.scoutIntelUntil?.[bucket] ?? -1) - year);
+}
+
 function getAttackImpactModifier(player, bucket, year) {
   return hasActiveScoutIntel(player, bucket, year) ? 1 : 0.8;
 }
@@ -1039,16 +1044,17 @@ function resolveScoutAction(room, player, opponent, action) {
   const bucket = isValidTargetBucket(action.targetBucket) ? action.targetBucket : 'economy';
   if (player.units.scout_drone <= 0 || room.year < player.scoutCooldownUntil) return;
   player.scoutCooldownUntil = room.year + 1;
-  player.scoutIntelUntil[bucket] = Math.max(player.scoutIntelUntil[bucket] || -1, room.year + 2);
+  player.scoutIntelUntil[bucket] = Math.max(player.scoutIntelUntil[bucket] || -1, room.year + 3);
+  const yearsRemaining = getScoutIntelYearsRemaining(player, bucket, room.year);
   const details = buildScoutReport(room, opponent, bucket);
   appendIntel(player, room.year, {
     tone: 'error',
     bucket,
     title: `${getBucketLabel(bucket)} scout report`,
-    summary: `Scout completed on ${getBucketLabel(bucket)}.`,
+    summary: `Scout completed on ${getBucketLabel(bucket)}. Intel stays active for ${yearsRemaining} years.`,
     details
   });
-  appendEvent(player, room.year, `🛰️ Scout completed on ${getBucketLabel(bucket)}. See Opponent Intel.`, 'error');
+  appendEvent(player, room.year, `🛰️ Scout completed on ${getBucketLabel(bucket)}. Intel active for ${yearsRemaining} years. See Opponent Intel.`, 'error');
   appendEvent(opponent, room.year, `👁️ Scout detected over ${getBucketLabel(bucket)}.`, 'error blink');
 }
 
@@ -1303,9 +1309,9 @@ function resolveTick(room) {
     if (isYearEnd) {
       const opponent = room.players[room.playerOrder.find((x) => x !== playerId)];
       for (const action of p.pending) {
-        if (action.type === 'missile') resolveMissileAction(room, p, opponent, action);
         if (action.type === 'scout') resolveScoutAction(room, p, opponent, action);
-        if (action.type === 'assault') resolveAssaultAction(room, p, opponent, action);
+        else if (action.type === 'missile') resolveMissileAction(room, p, opponent, action);
+        else if (action.type === 'assault') resolveAssaultAction(room, p, opponent, action);
       }
     }
 
@@ -1389,6 +1395,7 @@ function stripStateFor(room, playerId) {
       tradeOrders: p.tradeOrders,
       autoTrades: p.autoTrades,
       scoutCooldownUntil: p.scoutCooldownUntil,
+      scoutIntelUntil: p.scoutIntelUntil,
       opponentIntelLog: p.opponentIntelLog,
       defenceAssignments: p.defenceAssignments,
       forcedView: p.forcedView,

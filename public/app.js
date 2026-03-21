@@ -1017,6 +1017,22 @@ function getQuickActionState(type, missileId = state.selectedMissile, amount = g
   return { disabled: reasons.length > 0, reasons };
 }
 
+function getScoutIntelYearsRemaining(bucket) {
+  const until = state.game?.you?.scoutIntelUntil?.[bucket] ?? -1;
+  return Math.max(0, until - state.game.year);
+}
+
+function renderScoutIntelStatus() {
+  const rows = Object.entries(state.meta?.targetBuckets || {}).map(([bucket, config]) => {
+    const yearsRemaining = getScoutIntelYearsRemaining(bucket);
+    const status = yearsRemaining > 0
+      ? `100% impact ready for ${yearsRemaining} year${yearsRemaining === 1 ? '' : 's'}`
+      : 'No active intel — attacks land at 80%';
+    return `<div class="small">${config.emoji || ''} ${config.label}: ${status}</div>`;
+  }).join('');
+  return `<div class="panel inset"><h3>Scout Intel Counter</h3>${rows}</div>`;
+}
+
 function actionBtn(label, cb, options = {}) {
   const id = `btn_${Math.random().toString(36).slice(2)}`;
   if (!options.disabled) {
@@ -1511,7 +1527,9 @@ function renderWarRoom() {
   const assaultPayload = Object.fromEntries(getAssaultUnits().map(([id]) => [id, state.warRoomDraft[id] || 0]).filter(([, count]) => count > 0));
   tabContent.innerHTML = `<h3>War Room</h3>
     <p>Queue actions now. All attacks resolve when the current year ends.</p>
-    <div class="small">Scout the same target bucket first for 100% attack impact. Attacks without active scout intel land at 80% impact.</div>
+    <div class="small">Queue a scout before your attack on the same bucket to get 100% impact. If the attack is queued before the scout, it stays at 80%.</div>
+    <div class="small">Economy, Buildings, and Research Center scout intel now lasts for 3 years after the scout resolves.</div>
+    ${renderScoutIntelStatus()}
     ${renderPendingActions()}
     <div class="card">
       ${renderReasons(scoutState.reasons)}
