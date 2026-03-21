@@ -25,6 +25,8 @@ All upkeep values are per year and are scaled each tick.
 | `ballistic_missile` | Ballistic Missile | military | steel 20, alloy 20, oil 12, copper 8, uranium 3 | - | 160 | - | 160 | `missile_silo` | missile |
 | `cruise_missile` | Cruise Missile | military | steel 14, alloy 12, oil 10, copper 4, polymer 5 | - | 110 | - | 110 | `missile_silo` | missile |
 | `scout_drone` | Scout Drone | military | oil 5, electricity 3, copper 2, glass 2 | electricity 0.08 | - | - | - | `radar_station` | utility |
+| `anti_missile_battery` | Anti-Missile Battery | defence | steel 45, oil 20, magnet 18, copper 18 | electricity 0.08 | - | 24 | 16 | `guided_missiles` | defence-assignable, build-label |
+| `land_mine` | Land Mine | defence | lumber 60, steel 40, polymer 16 | polymer 0.04 | - | 18 | 12 | - | defence-assignable, build-label |
 | `anti_tank_squad` | Anti-Tank Squad | defence | nutrition 10, steel 12, polymer 6 | nutrition 0.15 | - | 18 | 12 | `barracks`, `tanks` | defence-assignable |
 | `naval_strike_missile` | Naval Strike Missile | defence | steel 30, alloy 24, oil 16, copper 8 | - | - | 45 | 30 | `dry_dock`, `guided_missiles` | defence-assignable |
 | `air_defence_gun` | Air Defence Gun | defence | steel 26, alloy 14, electricity 10, copper 10 | electricity 0.08, copper 0.05 | - | 28 | 19 | `airfield`, `guided_missiles` | defence-assignable |

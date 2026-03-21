@@ -67,27 +67,6 @@ const BUILDINGS = {
   barracks: { name: 'Military Camp', cost: { lumber: 25, steel: 20, concrete: 10 }, buildTime: 2, category: 'support' },
   factory: { name: 'Factory', cost: { steel: 35, alloy: 20, oil: 10, copper: 15, concrete: 10 }, buildTime: 3, requires: ['electricity'], category: 'support' },
   radar_station: { name: 'Radar Station', cost: { steel: 20, alloy: 12, magnet: 10, copper: 12, glass: 8 }, buildTime: 2, requires: ['advanced_scouting'], category: 'support' },
-  anti_missile_battery: {
-    name: 'Anti-Missile Battery',
-    cost: { steel: 45, oil: 20, magnet: 18, copper: 18 },
-    buildTime: 2,
-    requires: ['guided_missiles'],
-    category: 'military',
-    defenceAssignable: true,
-    defense: 24,
-    combatWeight: 16,
-    missileIntercept: [['ballistic_missile', 0.5], ['cruise_missile', 1]]
-  },
-  land_mine: {
-    name: 'Land Mine',
-    cost: { lumber: 60, steel: 40, polymer: 16 },
-    buildTime: 2,
-    category: 'military',
-    defenceAssignable: true,
-    defense: 18,
-    combatWeight: 12,
-    combatProfile: [['tank', 1], ['infantry', 4], ['special_force', 4]]
-  },
   dry_dock: { name: 'Dry Dock', cost: { lumber: 45, steel: 35, concrete: 25, polymer: 10 }, buildTime: 3, category: 'support' },
   airfield: { name: 'Airfield', cost: { steel: 55, alloy: 30, concrete: 40, glass: 15, copper: 18 }, buildTime: 3, category: 'support' }
 };
@@ -225,6 +204,29 @@ const UNITS = {
     }
   },
   scout_drone: { name: 'Scout Drone', section: 'military', cost: { oil: 5, electricity: 3, copper: 2, glass: 2 }, upkeep: { electricity: 0.08 }, requiresBuilding: 'radar_station' },
+  anti_missile_battery: {
+    name: 'Anti-Missile Battery',
+    section: 'defence',
+    cost: { steel: 45, oil: 20, magnet: 18, copper: 18 },
+    upkeep: { electricity: 0.08 },
+    requiresTech: 'guided_missiles',
+    defenceAssignable: true,
+    defense: 24,
+    combatWeight: 16,
+    buildLabel: 'Build',
+    missileIntercept: [['ballistic_missile', 0.5], ['cruise_missile', 1]]
+  },
+  land_mine: {
+    name: 'Land Mine',
+    section: 'defence',
+    cost: { lumber: 60, steel: 40, polymer: 16 },
+    upkeep: { polymer: 0.04 },
+    defenceAssignable: true,
+    defense: 18,
+    combatWeight: 12,
+    buildLabel: 'Build',
+    combatProfile: [['tank', 1], ['infantry', 4], ['special_force', 4]]
+  },
   anti_tank_squad: {
     name: 'Anti-Tank Squad',
     section: 'defence',
@@ -335,8 +337,6 @@ const STARTING_BUILDINGS = {
   barracks: 0,
   factory: 0,
   radar_station: 0,
-  anti_missile_battery: 0,
-  land_mine: 0,
   dry_dock: 0,
   airfield: 0
 };
@@ -353,6 +353,8 @@ const STARTING_UNITS = {
   cruise_missile: 0,
   submarine: 0,
   scout_drone: 0,
+  anti_missile_battery: 0,
+  land_mine: 0,
   anti_tank_squad: 0,
   naval_strike_missile: 0,
   air_defence_gun: 0,
@@ -414,6 +416,11 @@ function isValidTargetBucket(bucket) {
 function hasActiveScoutIntel(player, bucket, year) {
   if (!isValidTargetBucket(bucket)) return false;
   return year < (player.scoutIntelUntil?.[bucket] ?? -1);
+}
+
+function getScoutIntelYearsRemaining(player, bucket, year) {
+  if (!isValidTargetBucket(bucket)) return 0;
+  return Math.max(0, (player.scoutIntelUntil?.[bucket] ?? -1) - year);
 }
 
 function getAttackImpactModifier(player, bucket, year) {
@@ -590,6 +597,11 @@ function getTradeSellRevenue(resource, amount, fee = TRADE_FEE_MANUAL) {
 
 function getEntityConfig(id) {
   return UNITS[id] || BUILDINGS[id] || null;
+}
+
+function getUnitActionWord(unit, past = false) {
+  if (unit?.buildLabel === 'Build') return past ? 'Built' : 'Build';
+  return past ? 'Trained' : 'Train';
 }
 
 function getOwnedAssetCount(player, id) {
@@ -1039,16 +1051,17 @@ function resolveScoutAction(room, player, opponent, action) {
   const bucket = isValidTargetBucket(action.targetBucket) ? action.targetBucket : 'economy';
   if (player.units.scout_drone <= 0 || room.year < player.scoutCooldownUntil) return;
   player.scoutCooldownUntil = room.year + 1;
-  player.scoutIntelUntil[bucket] = Math.max(player.scoutIntelUntil[bucket] || -1, room.year + 2);
+  player.scoutIntelUntil[bucket] = Math.max(player.scoutIntelUntil[bucket] || -1, room.year + 3);
+  const yearsRemaining = getScoutIntelYearsRemaining(player, bucket, room.year);
   const details = buildScoutReport(room, opponent, bucket);
   appendIntel(player, room.year, {
     tone: 'error',
     bucket,
     title: `${getBucketLabel(bucket)} scout report`,
-    summary: `Scout completed on ${getBucketLabel(bucket)}.`,
+    summary: `Scout completed on ${getBucketLabel(bucket)}. Intel stays active for ${yearsRemaining} years.`,
     details
   });
-  appendEvent(player, room.year, `🛰️ Scout completed on ${getBucketLabel(bucket)}. See Opponent Intel.`, 'error');
+  appendEvent(player, room.year, `🛰️ Scout completed on ${getBucketLabel(bucket)}. Intel active for ${yearsRemaining} years. See Opponent Intel.`, 'error');
   appendEvent(opponent, room.year, `👁️ Scout detected over ${getBucketLabel(bucket)}.`, 'error blink');
 }
 
@@ -1303,9 +1316,9 @@ function resolveTick(room) {
     if (isYearEnd) {
       const opponent = room.players[room.playerOrder.find((x) => x !== playerId)];
       for (const action of p.pending) {
-        if (action.type === 'missile') resolveMissileAction(room, p, opponent, action);
         if (action.type === 'scout') resolveScoutAction(room, p, opponent, action);
-        if (action.type === 'assault') resolveAssaultAction(room, p, opponent, action);
+        else if (action.type === 'missile') resolveMissileAction(room, p, opponent, action);
+        else if (action.type === 'assault') resolveAssaultAction(room, p, opponent, action);
       }
     }
 
@@ -1389,6 +1402,7 @@ function stripStateFor(room, playerId) {
       tradeOrders: p.tradeOrders,
       autoTrades: p.autoTrades,
       scoutCooldownUntil: p.scoutCooldownUntil,
+      scoutIntelUntil: p.scoutIntelUntil,
       opponentIntelLog: p.opponentIntelLog,
       defenceAssignments: p.defenceAssignments,
       forcedView: p.forcedView,
@@ -1565,26 +1579,28 @@ const server = http.createServer(async (req, res) => {
       } else if (type === 'train') {
         const unit = UNITS[actionPayload.id];
         if (!unit) return writeJson(res, 400, { error: 'Invalid unit' });
+        const actionWord = getUnitActionWord(unit);
+        const actionWordPast = getUnitActionWord(unit, true);
         if (unit.requiresBuilding && p.buildings[unit.requiresBuilding] <= 0) {
-          appendEvent(p, room.year, `❌ Training failed: Required building missing for ${unit.name}`, 'error');
+          appendEvent(p, room.year, `❌ ${actionWord} failed: Required building missing for ${unit.name}`, 'error');
           broadcastRoom(room);
           return writeJson(res, 400, { error: 'Required building missing' });
         }
         if (unit.requiresTech && !hasResearch(p, unit.requiresTech, room.year, room.ticks)) {
-          appendEvent(p, room.year, `❌ Training failed: Research missing for ${unit.name}`, 'error');
+          appendEvent(p, room.year, `❌ ${actionWord} failed: Research missing for ${unit.name}`, 'error');
           broadcastRoom(room);
           return writeJson(res, 400, { error: 'Research missing' });
         }
         const amount = Math.max(1, Number(actionPayload.amount || 1));
         const totalCost = Object.fromEntries(Object.entries(unit.cost).map(([k, v]) => [k, v * amount]));
         if (!canAfford(p.resources, totalCost)) {
-          appendEvent(p, room.year, `❌ Training failed: Insufficient resources for ${amount} ${unit.name}`, 'error');
+          appendEvent(p, room.year, `❌ ${actionWord} failed: Insufficient resources for ${amount} ${unit.name}`, 'error');
           broadcastRoom(room);
           return writeJson(res, 400, { error: 'Insufficient resources' });
         }
         payCost(p.resources, totalCost);
         p.units[actionPayload.id] += amount;
-        appendEvent(p, room.year, `🪖 Trained ${amount} ${unit.name}`);
+        appendEvent(p, room.year, `🪖 ${actionWordPast} ${amount} ${unit.name}`);
       } else if (type === 'research') {
         const tech = RESEARCH[actionPayload.id];
         if (!tech) return writeJson(res, 400, { error: 'Invalid tech' });
