@@ -18,7 +18,7 @@ Duration is in months.
 | Id | Name | Cost | Duration | Prerequisite | Min Year |
 | --- | --- | --- | --- | --- | --- |
 | `basic_tools` | Basic Tools | alloy 15, lumber 10 | 9 | - | 3 |
-| `electricity` | Electricity | alloy 25, magnet 5, copper 12 | 12 | `basic_tools` | - |
+| `electricity` | Electricity Research | alloy 25, magnet 5, copper 12 | 12 | `basic_tools` | - |
 | `guided_missiles` | Guided Missiles | alloy 30, magnet 10, copper 8 | 12 | `basic_tools` | - |
 | `missile_silo` | Missile Silo | alloy 45, magnet 20, steel 10, concrete 20, uranium 8 | 12 | `guided_missiles` | - |
 | `industrial_furnaces` | Industrial Furnaces | alloy 20, steel 5, copper 6 | 9 | `basic_tools` | - |
@@ -28,5 +28,5 @@ Duration is in months.
 | `aerial_warfare` | Aerial Warfare | alloy 50, silicon 20, copper 15, glass 10 | 12 | `electricity` | - |
 | `advanced_scouting` | Advanced Scouting | alloy 25, magnet 10, copper 10, silicon 8 | 9 | `industrial_furnaces` | - |
 | `polymer` | Polymer Research | alloy 30, oil 10, copper 5 | 12 | `electricity` | - |
-| `industrial_materials` | Industrial Materials | alloy 20, steel 5, electricity 5, glass 10, concrete 10 | 9 | `industrial_furnaces` | - |
+| `industrial_materials` | Industrial Materials Research | alloy 20, steel 5, electricity 5, glass 10, concrete 10 | 9 | `industrial_furnaces` | - |
 | `nuclear_technology` | Nuclear Technology | alloy 100, magnet 50, electricity 30, uranium 20, copper 15 | 12 | `advanced_mining` | - |

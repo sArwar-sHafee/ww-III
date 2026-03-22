@@ -16,22 +16,22 @@
 - Uranium
 
 ## Trade Prices
-Manual trade fee is 2 credits. Auto trade fee is 1 credit.
+Manual trade fee is 20% of trade value. Auto trade fee is 10% of trade value. Percentage fees are rounded up to whole credits. Auto trade cancellation costs 20 credits.
 
 | Resource | Price per Unit |
 | --- | --- |
 | nutrition | 1 |
 | lumber | 2 |
 | steel | 3 |
-| copper | 3 |
-| alloy | 5 |
-| oil | 4 |
-| magnet | 6 |
-| electricity | 2 |
-| glass | 3 |
-| polymer | 4 |
-| concrete | 3 |
-| silicon | 6 |
+| copper | 4 |
+| alloy | 7 |
+| oil | 10 |
+| magnet | 12 |
+| electricity | 5 |
+| glass | 5 |
+| polymer | 8 |
+| concrete | 6 |
+| silicon | 14 |
 | uranium | 60 |
 
 ## Trade Rules
