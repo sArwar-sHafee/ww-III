@@ -150,6 +150,39 @@ function clearSession() {
   localStorage.removeItem(SESSION_KEY);
 }
 
+function resetToLobby(message = '', type = 'info') {
+  clearInterval(state.pollTimer);
+  state.pollTimer = null;
+  closeStream();
+  clearSession();
+  state.roomId = null;
+  state.playerId = null;
+  state.reconnectToken = null;
+  state.game = null;
+  state.connection = 'idle';
+  state.lastStateAt = 0;
+  state.tab = 'dashboard';
+  state.lastTabSignature = null;
+  state.forceTabRefresh = false;
+  state.unitDrafts = {};
+  state.tradeDrafts = {};
+  state.tradeAutoFlags = {};
+  state.warRoomDraft = {};
+  state.selectedResource = null;
+  roomInfoEl.textContent = '';
+  joinFlowEl.classList.add('hidden');
+  roomInputEl.value = '';
+  setupEl.classList.remove('hidden');
+  gameLayoutEl.classList.add('hidden');
+  tabsEl.innerHTML = '';
+  tabContent.innerHTML = '';
+  sidebarContentEl.innerHTML = '';
+  eventsEl.innerHTML = '';
+  chatEl.innerHTML = '';
+  renderStatusBanner();
+  setNotice(message, type);
+}
+
 function readSession() {
   try {
     return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
@@ -1657,8 +1690,14 @@ function renderTab(options = {}) {
 }
 
 async function sendAction(type, payload) {
+  const text = typeof payload?.text === 'string' ? payload.text.trim() : '';
+  const isSoloSurrender = type === 'chat' && text === '/surrender' && !state.game?.opponent?.name;
   try {
     await api('/api/action', { roomId: state.roomId, playerId: state.playerId, type, payload });
+    if (isSoloSurrender) {
+      resetToLobby('You surrendered and returned to the lobby.', 'info');
+      return;
+    }
     state.forceTabRefresh = true;
     setNotice(null);
   } catch (error) {
