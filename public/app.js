@@ -604,17 +604,51 @@ function getTradeUnitPrice(resource) {
   return state.meta?.tradePrices?.[resource] || 1;
 }
 
-function getTradeFee(autoMode) {
-  if (autoMode) return state.meta?.tradeFeeAuto ?? 1;
-  return state.meta?.tradeFeeManual ?? 1;
+function getTradeFeeRate(autoMode) {
+  if (autoMode) return state.meta?.tradeFeeAutoRate ?? 0.1;
+  return state.meta?.tradeFeeManualRate ?? 0.2;
+}
+
+function getTradeFeeLabel(rate) {
+  return `${Math.round(rate * 100)}%`;
+}
+
+function getAutoTradeCancelFee() {
+  return state.meta?.autoTradeCancelFee ?? 20;
+}
+
+function getTradeSubtotal(resource, amount) {
+  return amount * getTradeUnitPrice(resource);
+}
+
+function getTradeFeeAmount(resource, amount, autoMode) {
+  const subtotal = getTradeSubtotal(resource, amount);
+  const feeRate = getTradeFeeRate(autoMode);
+  if (subtotal <= 0 || feeRate <= 0) return 0;
+  return Math.ceil(subtotal * feeRate);
 }
 
 function getTradeBuyCost(resource, amount, autoMode) {
-  return amount * getTradeUnitPrice(resource) + getTradeFee(autoMode);
+  return getTradeSubtotal(resource, amount) + getTradeFeeAmount(resource, amount, autoMode);
 }
 
 function getTradeSellReturn(resource, amount, autoMode) {
-  return Math.max(0, amount * getTradeUnitPrice(resource) - getTradeFee(autoMode));
+  return Math.max(0, getTradeSubtotal(resource, amount) - getTradeFeeAmount(resource, amount, autoMode));
+}
+
+function getTradeBuyMaxByCredits(resource, credits, autoMode) {
+  if (credits <= 0) return 0;
+  const unitPrice = getTradeUnitPrice(resource);
+  let low = 0;
+  let high = Math.max(0, Math.floor(credits / Math.max(1, unitPrice)));
+
+  while (low < high) {
+    const mid = Math.floor((low + high + 1) / 2);
+    if (getTradeBuyCost(resource, mid, autoMode) <= credits) low = mid;
+    else high = mid - 1;
+  }
+
+  return low;
 }
 
 function getCreditsNetPerYear() {
@@ -664,10 +698,10 @@ function getTradeCardState(resource) {
   const credits = Math.floor(you?.credits || 0);
   const price = getTradeUnitPrice(resource);
   const autoMode = isTradeAutoMode(resource);
-  const fee = getTradeFee(autoMode);
+  const feeRate = getTradeFeeRate(autoMode);
   const capacity = getResourceCapacity(resource, you?.buildings || {});
   const freeSpace = Number.isFinite(capacity) ? Math.max(0, Math.floor(capacity - stock)) : Infinity;
-  const buyMaxByCredits = credits >= fee + price ? Math.floor((credits - fee) / price) : 0;
+  const buyMaxByCredits = getTradeBuyMaxByCredits(resource, credits, autoMode);
   const buyMax = Math.max(0, Math.min(buyMaxByCredits, freeSpace));
   const sellMax = stock;
   const autoTrade = you?.autoTrades?.[resource] || null;
@@ -682,7 +716,10 @@ function getTradeCardState(resource) {
 
   const phaseActive = state.game?.phase === 'active';
   const buyDisabled = !phaseActive || amount < 1 || amount > buyMax;
+  const cancelFee = getAutoTradeCancelFee();
+  const cancelDisabled = !phaseActive || credits < cancelFee;
   const sellDisabled = !phaseActive || amount < 1 || amount > sellMax;
+  const feeAmount = amount > 0 ? getTradeFeeAmount(resource, amount, autoMode) : 0;
 
   return {
     amount,
@@ -691,7 +728,10 @@ function getTradeCardState(resource) {
     buyDisabled,
     buyMax,
     capacity,
-    fee,
+    cancelDisabled,
+    cancelFee,
+    feeAmount,
+    feeRate,
     phaseActive,
     price,
     sellDisabled,
@@ -739,6 +779,7 @@ function updateTradeCardPreview(resource) {
   const actionDisabledReason = autoTradeLocked ? 'Cancel trade to change it' : '';
   const buyLabel = autoMode ? 'Auto Buy' : 'Buy';
   const sellLabel = autoMode ? 'Auto Sell' : 'Sell';
+  const cancelTitle = tradeState.cancelDisabled ? `Need ${tradeState.cancelFee} credits to cancel` : `Costs ${tradeState.cancelFee} credits to cancel`;
 
   const sliderEl = tabContent.querySelector(`[data-trade-slider="${resource}"]`);
   if (sliderEl) {
@@ -752,6 +793,12 @@ function updateTradeCardPreview(resource) {
 
   const limitsEl = tabContent.querySelector(`[data-trade-limits="${resource}"]`);
   if (limitsEl) limitsEl.textContent = `Buy max: ${tradeState.buyMax} | Sell max: ${tradeState.sellMax}`;
+
+  const rateEl = tabContent.querySelector(`[data-trade-rate="${resource}"]`);
+  if (rateEl) rateEl.textContent = `Rate: ${tradeState.price} credit${tradeState.price === 1 ? '' : 's'} per unit | Fee: ${getTradeFeeLabel(tradeState.feeRate)} ${autoMode ? 'auto' : 'manual'}`;
+
+  const totalsEl = tabContent.querySelector(`[data-trade-totals="${resource}"]`);
+  if (totalsEl) totalsEl.textContent = `Buy total: ${tradeState.buyCost} | Sell return: ${tradeState.sellReturn} | Fee now: ${tradeState.feeAmount}`;
 
   const decreaseBtn = tabContent.querySelector(`[data-trade-decrease="${resource}"]`);
   if (decreaseBtn) decreaseBtn.disabled = autoTradeLocked || tradeState.amount <= 1;
@@ -771,6 +818,12 @@ function updateTradeCardPreview(resource) {
     sellBtn.textContent = sellLabel;
     sellBtn.disabled = autoTradeLocked || tradeState.sellDisabled;
     sellBtn.title = actionDisabledReason || getTradeReason('sell', tradeState);
+  }
+
+  const cancelBtn = tabContent.querySelector(`[data-trade-cancel-auto="${resource}"]`);
+  if (cancelBtn) {
+    cancelBtn.disabled = tradeState.cancelDisabled;
+    cancelBtn.title = cancelTitle;
   }
 }
 
@@ -1202,11 +1255,12 @@ function renderTrade() {
     const buyLabel = autoMode ? 'Auto Buy' : 'Buy';
     const sellLabel = autoMode ? 'Auto Sell' : 'Sell';
     const actionDisabledReason = autoTradeLocked ? 'Cancel trade to change it' : '';
+    const cancelTitle = tradeState.cancelDisabled ? `Need ${tradeState.cancelFee} credits to cancel` : `Costs ${tradeState.cancelFee} credits to cancel`;
 
     return `<div class="card trade-card">
       <b>${emojis[resource] || ''} ${resource}</b>
       <div class="small">Stock: ${tradeState.stock} | Credits: ${you.credits}</div>
-      <div class="small">Rate: ${tradeState.price} credit${tradeState.price === 1 ? '' : 's'} per unit + ${tradeState.fee} credit ${autoMode ? 'auto' : 'manual'} fee</div>
+      <div class="small" data-trade-rate="${resource}">Rate: ${tradeState.price} credit${tradeState.price === 1 ? '' : 's'} per unit | Fee: ${getTradeFeeLabel(tradeState.feeRate)} ${autoMode ? 'auto' : 'manual'}</div>
       <label class="small trade-auto-toggle">
         <input type="checkbox" data-trade-auto-toggle="${resource}" ${autoMode ? 'checked' : ''} ${tradeState.autoTrade ? 'disabled' : ''} />
         Trade
@@ -1219,13 +1273,14 @@ function renderTrade() {
         <div class="small trade-amount-display" data-trade-amount="${resource}">Amount: ${tradeState.amount}</div>
         <button type="button" data-trade-increase="${resource}" ${(autoTradeLocked || tradeState.amount >= tradeState.sliderMax) ? 'disabled' : ''}>+</button>
       </div>
+      <div class="small" data-trade-totals="${resource}">Buy total: ${tradeState.buyCost} | Sell return: ${tradeState.sellReturn} | Fee now: ${tradeState.feeAmount}</div>
       <div class="small" data-trade-limits="${resource}">Buy max: ${tradeState.buyMax} | Sell max: ${tradeState.sellMax}</div>
       ${tradeState.autoTrade ? `<div class="small">🔁 Trade active: ${tradeState.autoTrade.mode} ${tradeState.autoTrade.amount} ${resource}/yr</div>` : ''}
       ${orders.length ? `<div class="trade-order-list">${orders.map((order) => `<div class="small" data-trade-order-id="${order.id}">${getTradeOrderLabel(order)}</div>`).join('')}</div>` : ''}
       <div class="row trade-actions">
         <button type="button" data-trade-buy="${resource}" ${autoTradeLocked || tradeState.buyDisabled ? 'disabled' : ''} title="${actionDisabledReason || getTradeReason('buy', tradeState)}">${buyLabel}</button>
         <button type="button" data-trade-sell="${resource}" ${autoTradeLocked || tradeState.sellDisabled ? 'disabled' : ''} title="${actionDisabledReason || getTradeReason('sell', tradeState)}">${sellLabel}</button>
-        ${tradeState.autoTrade ? `<button type="button" data-trade-cancel-auto="${resource}">Cancel Trade</button>` : ''}
+        ${tradeState.autoTrade ? `<button type="button" data-trade-cancel-auto="${resource}" ${tradeState.cancelDisabled ? 'disabled' : ''} title="${cancelTitle}">Cancel Trade (-${tradeState.cancelFee})</button>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -1233,7 +1288,8 @@ function renderTrade() {
   tabContent.innerHTML = `
     <h3>Trade</h3>
     <div class="small">Population generates credits at year end. Manual trades reserve the selected amount now and settle after ${state.meta.tradeDelayMonths || 3} months.</div>
-    <div class="small">Manual trade fee: ${state.meta.tradeFeeManual ?? 2} credits. Trade fee: ${state.meta.tradeFeeAuto ?? 1} credit.</div>
+    <div class="small">Manual trade fee: ${getTradeFeeLabel(state.meta?.tradeFeeManualRate ?? 0.2)} of trade value. Auto trade fee: ${getTradeFeeLabel(state.meta?.tradeFeeAutoRate ?? 0.1)} of trade value.</div>
+    <div class="small">Auto trade cancel fee: ${getAutoTradeCancelFee()} credits.</div>
     <div class="small">Treasury: ${you.credits} credits</div>
     <div class="action-grid">${rows}</div>
   `;

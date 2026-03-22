@@ -12,8 +12,9 @@ const SSE_HEARTBEAT_MS = 15_000;
 const TICK_MS = 1000;
 const TICKS_PER_YEAR = 60;
 const TICKS_PER_MONTH = 5;
-const TRADE_FEE_MANUAL = 2;
-const TRADE_FEE_AUTO = 1;
+const TRADE_FEE_MANUAL_RATE = 0.2;
+const TRADE_FEE_AUTO_RATE = 0.1;
+const AUTO_TRADE_CANCEL_FEE = 20;
 const STARTING_RESOURCES = { nutrition: 200, lumber: 60, steel: 40, copper: 30, alloy: 0, oil: 0, magnet: 0, electricity: 0, glass: 0, polymer: 0, concrete: 0, silicon: 0, uranium: 0 };
 const RESOURCE_KEYS = Object.keys(STARTING_RESOURCES);
 const TRADE_DELAY_MONTHS = 3;
@@ -22,15 +23,15 @@ const TRADE_PRICES = {
   nutrition: 1,
   lumber: 2,
   steel: 3,
-  copper: 3,
-  alloy: 5,
-  oil: 4,
-  magnet: 6,
-  electricity: 2,
-  glass: 3,
-  polymer: 4,
-  concrete: 3,
-  silicon: 6,
+  copper: 4,
+  alloy: 7,
+  oil: 10,
+  magnet: 12,
+  electricity: 5,
+  glass: 5,
+  polymer: 8,
+  concrete: 6,
+  silicon: 14,
   uranium: 60
 };
 const STARTING_POPULATION = 10;
@@ -50,19 +51,19 @@ const INTEL_EMOJIS = {
 };
 
 const BUILDINGS = {
-  farm: { name: 'Farm', cost: { lumber: 15, steel: 10 }, buildTime: 2, capacity: { nutrition: 200 }, production: { nutrition: 4 }, category: 'economy' },
-  lumber_camp: { name: 'Lumber Camp', cost: { lumber: 10, steel: 5 }, buildTime: 1, capacity: { lumber: 150 }, production: { lumber: 3 }, category: 'economy' },
+  farm: { name: 'Farm', cost: { lumber: 15, steel: 10 }, buildTime: 2, capacity: { nutrition: 200 }, production: { nutrition: 1 }, category: 'economy' },
+  lumber_camp: { name: 'Lumber Camp', cost: { lumber: 10, steel: 5 }, buildTime: 1, capacity: { lumber: 150 }, production: { lumber: 2 }, category: 'economy' },
   steel_mill: { name: 'Steel Mill', cost: { lumber: 20, steel: 10 }, buildTime: 2, capacity: { steel: 100 }, production: { steel: 2 }, category: 'economy' },
   copper_mine: { name: 'Copper Mine', cost: { lumber: 20, steel: 12 }, buildTime: 2, capacity: { copper: 120 }, production: { copper: 2 }, category: 'economy' },
-  alloy_quarry: { name: 'Alloy Quarry', cost: { lumber: 25, steel: 15 }, buildTime: 2, capacity: { alloy: 80 }, production: { alloy: 1 }, category: 'economy' },
+  alloy_quarry: { name: 'Alloy Quarry', cost: { lumber: 25, steel: 15 }, buildTime: 2, capacity: { alloy: 80 }, production: { alloy: 3 }, category: 'economy' },
   oil_rig: { name: 'Oil Rig', cost: { steel: 30, alloy: 20, concrete: 10 }, buildTime: 3, capacity: { oil: 100 }, production: { oil: 3 }, requires: ['electricity'], category: 'economy' },
-  magnet_extractor: { name: 'Magnet Extractor', cost: { steel: 35, alloy: 15, oil: 10, copper: 5 }, buildTime: 3, capacity: { magnet: 60 }, production: { magnet: 1 }, requires: ['advanced_mining'], category: 'economy' },
-  power_plant: { name: 'Power Plant', cost: { steel: 25, oil: 10, copper: 12, concrete: 10 }, buildTime: 2, capacity: { electricity: 80 }, production: { electricity: 3 }, upkeep: { oil: 0.3 }, requires: ['electricity'], category: 'economy' },
+  magnet_extractor: { name: 'Magnet Extractor', cost: { steel: 35, alloy: 15, oil: 10, copper: 5 }, buildTime: 3, capacity: { magnet: 60 }, production: { magnet: 3 }, requires: ['advanced_mining'], category: 'economy' },
+  power_plant: { name: 'Power Plant', cost: { steel: 25, oil: 10, copper: 12, concrete: 10 }, buildTime: 2, capacity: { electricity: 80 }, production: { electricity: 3 }, requires: ['electricity'], category: 'economy' },
   glassworks: { name: 'Glassworks', cost: { lumber: 15, steel: 10, copper: 4 }, buildTime: 2, capacity: { glass: 120 }, production: { glass: 2 }, requires: ['industrial_furnaces'], category: 'economy' },
   polymer_plant: { name: 'Polymer Plant', cost: { steel: 10, oil: 15, electricity: 5, copper: 4 }, buildTime: 2, capacity: { polymer: 120 }, production: { polymer: 2 }, requires: ['polymer'], category: 'economy' },
   concrete_plant: { name: 'Concrete Plant', cost: { lumber: 20, steel: 10, electricity: 5 }, buildTime: 2, capacity: { concrete: 180 }, production: { concrete: 3 }, requires: ['industrial_materials'], category: 'economy' },
-  silicon_refinery: { name: 'Silicon Refinery', cost: { steel: 20, alloy: 10, copper: 12, electricity: 5 }, buildTime: 3, capacity: { silicon: 80 }, production: { silicon: 1.5 }, requires: ['advanced_mining'], category: 'economy' },
-  uranium_mine: { name: 'Uranium Mine', cost: { steel: 30, alloy: 20, concrete: 15, electricity: 5 }, buildTime: 3, capacity: { uranium: 60 }, production: { uranium: 0.8 }, requires: ['advanced_mining'], category: 'economy' },
+  silicon_refinery: { name: 'Silicon Refinery', cost: { steel: 20, alloy: 10, copper: 12, electricity: 5 }, buildTime: 3, capacity: { silicon: 80 }, production: { silicon: 2 }, requires: ['advanced_mining'], category: 'economy' },
+  uranium_mine: { name: 'Uranium Mine', cost: { steel: 30, alloy: 20, concrete: 15, electricity: 5 }, buildTime: 3, capacity: { uranium: 60 }, production: { uranium: 1 }, requires: ['advanced_mining'], category: 'economy' },
   shelter: { name: 'Shelter', cost: { lumber: 20, steel: 10, concrete: 8 }, buildTime: 1, category: 'support' },
   barracks: { name: 'Military Camp', cost: { lumber: 25, steel: 20, concrete: 10 }, buildTime: 2, category: 'support' },
   factory: { name: 'Factory', cost: { steel: 35, alloy: 20, oil: 10, copper: 15, concrete: 10 }, buildTime: 3, requires: ['electricity'], category: 'support' },
@@ -277,7 +278,7 @@ const UNITS = {
 
 const RESEARCH = {
   basic_tools: { name: 'Basic Tools', cost: { alloy: 15, lumber: 10 }, years: 9, minYear: 3 },
-  electricity: { name: 'Electricity', cost: { alloy: 25, magnet: 5, copper: 12 }, years: 12, prereq: 'basic_tools' },
+  electricity: { name: 'Electricity Research', cost: { alloy: 25, magnet: 5, copper: 12 }, years: 12, prereq: 'basic_tools' },
   guided_missiles: { name: 'Guided Missiles', cost: { alloy: 30, magnet: 10, copper: 8 }, years: 12, prereq: 'basic_tools' },
   missile_silo: { name: 'Missile Silo', cost: { alloy: 45, magnet: 20, steel: 10, concrete: 20, uranium: 8 }, years: 12, prereq: 'guided_missiles' },
   industrial_furnaces: { name: 'Industrial Furnaces', cost: { alloy: 20, steel: 5, copper: 6 }, years: 9, prereq: 'basic_tools' },
@@ -287,7 +288,7 @@ const RESEARCH = {
   aerial_warfare: { name: 'Aerial Warfare', cost: { alloy: 50, silicon: 20, copper: 15, glass: 10 }, years: 12, prereq: 'electricity' },
   advanced_scouting: { name: 'Advanced Scouting', cost: { alloy: 25, magnet: 10, copper: 10, silicon: 8 }, years: 9, prereq: 'industrial_furnaces' },
   polymer: { name: 'Polymer Research', cost: { alloy: 30, oil: 10, copper: 5 }, years: 12, prereq: 'electricity' },
-  industrial_materials: { name: 'Industrial Materials', cost: { alloy: 20, steel: 5, electricity: 5, glass: 10, concrete: 10 }, years: 9, prereq: 'industrial_furnaces' },
+  industrial_materials: { name: 'Industrial Materials Research', cost: { alloy: 20, steel: 5, electricity: 5, glass: 10, concrete: 10 }, years: 9, prereq: 'industrial_furnaces' },
   nuclear_technology: { name: 'Nuclear Technology', cost: { alloy: 100, magnet: 50, electricity: 30, uranium: 20, copper: 15 }, years: 12, prereq: 'advanced_mining' }
 };
 
@@ -587,12 +588,22 @@ function getTradeUnitPrice(resource) {
   return TRADE_PRICES[resource] || 1;
 }
 
-function getTradeBuyCost(resource, amount, fee = TRADE_FEE_MANUAL) {
-  return amount * getTradeUnitPrice(resource) + fee;
+function getTradeSubtotal(resource, amount) {
+  return amount * getTradeUnitPrice(resource);
 }
 
-function getTradeSellRevenue(resource, amount, fee = TRADE_FEE_MANUAL) {
-  return Math.max(0, amount * getTradeUnitPrice(resource) - fee);
+function getTradeFeeAmount(resource, amount, feeRate = TRADE_FEE_MANUAL_RATE) {
+  const subtotal = getTradeSubtotal(resource, amount);
+  if (subtotal <= 0 || feeRate <= 0) return 0;
+  return Math.ceil(subtotal * feeRate);
+}
+
+function getTradeBuyCost(resource, amount, feeRate = TRADE_FEE_MANUAL_RATE) {
+  return getTradeSubtotal(resource, amount) + getTradeFeeAmount(resource, amount, feeRate);
+}
+
+function getTradeSellRevenue(resource, amount, feeRate = TRADE_FEE_MANUAL_RATE) {
+  return Math.max(0, getTradeSubtotal(resource, amount) - getTradeFeeAmount(resource, amount, feeRate));
 }
 
 function getEntityConfig(id) {
@@ -1010,7 +1021,7 @@ function resolveAutoTrades(room, player) {
     if (!config) continue;
 
     if (config.mode === 'buy') {
-      const cost = getTradeBuyCost(resource, config.amount, TRADE_FEE_AUTO);
+      const cost = getTradeBuyCost(resource, config.amount, TRADE_FEE_AUTO_RATE);
       const capacity = getPlayerCapacity(player)[resource];
       const reservedIncoming = getReservedIncomingTradeAmount(player, resource);
       if (player.credits < cost) {
@@ -1032,7 +1043,7 @@ function resolveAutoTrades(room, player) {
       continue;
     }
 
-    const revenue = getTradeSellRevenue(resource, config.amount, TRADE_FEE_AUTO);
+    const revenue = getTradeSellRevenue(resource, config.amount, TRADE_FEE_AUTO_RATE);
     player.resources[resource] -= config.amount;
     player.credits += revenue;
     appendEvent(player, room.year, `🔁 Auto sold ${config.amount} ${resource} for ${revenue} credits`);
@@ -1636,7 +1647,7 @@ const server = http.createServer(async (req, res) => {
         if (!RESOURCE_KEYS.includes(resource)) return writeJson(res, 400, { error: 'Invalid resource' });
         if (!Number.isInteger(amount) || amount < 1) return writeJson(res, 400, { error: 'Invalid amount' });
         if (mode === 'buy') {
-          const cost = getTradeBuyCost(resource, amount, TRADE_FEE_MANUAL);
+          const cost = getTradeBuyCost(resource, amount, TRADE_FEE_MANUAL_RATE);
           const capacity = getPlayerCapacity(p)[resource];
           const reservedIncoming = getReservedIncomingTradeAmount(p, resource);
           if (p.credits < cost) return writeJson(res, 400, { error: 'Not enough credits' });
@@ -1662,8 +1673,10 @@ const server = http.createServer(async (req, res) => {
         const resource = actionPayload.resource;
         if (!RESOURCE_KEYS.includes(resource)) return writeJson(res, 400, { error: 'Invalid resource' });
         if (!p.autoTrades[resource]) return writeJson(res, 400, { error: 'No auto trade set' });
+        if (p.credits < AUTO_TRADE_CANCEL_FEE) return writeJson(res, 400, { error: `Need ${AUTO_TRADE_CANCEL_FEE} credits to cancel auto trade` });
+        p.credits -= AUTO_TRADE_CANCEL_FEE;
         p.autoTrades[resource] = null;
-        appendEvent(p, room.year, `🛑 Auto trade cancelled for ${resource}`);
+        appendEvent(p, room.year, `🛑 Auto trade cancelled for ${resource} (-${AUTO_TRADE_CANCEL_FEE} credits)`);
       } else if (type === 'chat') {
         const msg = String(actionPayload.text || '').slice(0, 240);
         if (!msg) return writeJson(res, 400, { error: 'Empty message' });
@@ -1750,8 +1763,9 @@ const server = http.createServer(async (req, res) => {
         tickMs: TICK_MS,
         ticksPerMonth: TICKS_PER_MONTH,
         ticksPerYear: TICKS_PER_YEAR,
-        tradeFeeManual: TRADE_FEE_MANUAL,
-        tradeFeeAuto: TRADE_FEE_AUTO,
+        tradeFeeManualRate: TRADE_FEE_MANUAL_RATE,
+        tradeFeeAutoRate: TRADE_FEE_AUTO_RATE,
+        autoTradeCancelFee: AUTO_TRADE_CANCEL_FEE,
         tradeDelayMonths: TRADE_DELAY_MONTHS,
         tradePrices: TRADE_PRICES
       });

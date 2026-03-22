@@ -17,7 +17,7 @@ The current implementation is a server-authoritative Node.js prototype with SSE 
 - At the end of each year, the player gains credits equal to current population.
 - Manual trades have a 3-month delivery delay.
 - Auto trades execute once per year at year end.
-- Trade prices vary by resource. Manual trade fee is 2 credits, auto trade fee is 1 credit.
+- Trade prices vary by resource. Manual trade fee is 20% of trade value, auto trade fee is 10% of trade value, and auto trade cancellation costs 20 credits.
 
 ## Main Tabs
 1. Economy
