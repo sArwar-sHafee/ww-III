@@ -7,15 +7,15 @@ The current implementation is a server-authoritative Node.js prototype with SSE 
 
 ## Core Loop
 - 1 tick = 1 second.
-- 60 ticks = 1 year.
-- 5 ticks = 1 month.
+- 48 ticks = 1 year.
+- 3 ticks = 1 month.
 - Buildings, resource deltas, upkeep, queued war actions, population changes, and treasury income resolve on the server.
 
 ## Economy And Treasury
 - Resources: nutrition, lumber, steel, copper, alloy, oil, magnet, electricity, glass, polymer, concrete, silicon, uranium.
 - Credits are the treasury currency.
 - At the end of each year, the player gains credits equal to current population.
-- Manual trades have a 3-month delivery delay.
+- Manual trades have a 3-month delivery delay (9 seconds total).
 - Auto trades execute once per year at year end.
 - Trade prices vary by resource. Manual trade fee is 20% of trade value, auto trade fee is 10% of trade value, and auto trade cancellation costs 20 credits.
 

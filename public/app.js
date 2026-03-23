@@ -342,7 +342,7 @@ function formatSigned(value) {
 }
 
 function ticksToMonths(ticks) {
-  return Math.max(1, Math.ceil(ticks / (state.meta?.ticksPerMonth || 5)));
+  return Math.max(1, Math.ceil(ticks / (state.meta?.ticksPerMonth || 3)));
 }
 
 function flooredResources(resources = {}) {
@@ -1039,7 +1039,7 @@ function getResearchDisabledMonthsRemaining(id) {
   const currentTick = state.game?.ticks || 0;
   const remainingTicks = Math.max(0, untilTick - currentTick);
   if (remainingTicks <= 0) return 0;
-  return Math.ceil(remainingTicks / (state.meta?.ticksPerMonth || 5));
+  return Math.ceil(remainingTicks / (state.meta?.ticksPerMonth || 3));
 }
 
 function getBuildCardState(id) {
@@ -1571,7 +1571,7 @@ function renderResearch() {
     <div class="action-grid">` +
     Object.entries(state.meta.research).map(([id, tech]) => {
       const cardState = getResearchCardState(id);
-      const progress = cardState.isCurrent ? Math.max(0, 100 - Math.floor((you.research.active.ticksRemaining / (tech.years * (state.meta?.ticksPerMonth || 5))) * 100)) : (you.research.completed.includes(id) ? 100 : 0);
+      const progress = cardState.isCurrent ? Math.max(0, 100 - Math.floor((you.research.active.ticksRemaining / (tech.years * (state.meta?.ticksPerMonth || 3))) * 100)) : (you.research.completed.includes(id) ? 100 : 0);
       const label = cardState.isCurrent ? `Researching... ${progress}%` : 'Start';
       return `<div class="card">
         <b>${tech.name}</b>

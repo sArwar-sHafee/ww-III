@@ -35,8 +35,8 @@ Manual trade fee is 20% of trade value. Auto trade fee is 10% of trade value. Pe
 | uranium | 60 |
 
 ## Trade Rules
-- Manual buy orders pay the full cost upfront and deliver after 3 months.
-- Manual sell orders remove resources immediately and pay credits after 3 months.
+- Manual buy orders pay the full cost upfront and deliver after 3 months (9 seconds).
+- Manual sell orders remove resources immediately and pay credits after 3 months (9 seconds).
 - Auto trades execute at year end and apply immediately.
 - Buy orders that overflow capacity are partially delivered and refunded at unit price.
 

@@ -1,6 +1,6 @@
 # Production
 
-Production is computed every tick and applied as `1/60` of yearly values.
+Production is computed every tick and applied as `1/48` of yearly values.
 
 ## Base Production (per year, per building)
 - Farm: nutrition +1
