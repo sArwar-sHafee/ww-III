@@ -1,7 +1,7 @@
 # Summary
 
 ## Current Prototype Rules
-- 2-player text RTS with a 1-second tick, 48-second year, and 3-second month.
+- 2-player text RTS with a 1-second tick, 36-second year, and 3-second month.
 - Resources, supports, military, defences, research, trade, and war actions are all server-controlled.
 - Credits are earned each year from population.
 - Manual trades have a 3-month delay (9 seconds total) and a 20% fee based on trade value.

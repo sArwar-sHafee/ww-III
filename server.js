@@ -10,7 +10,7 @@ const publicDir = path.join(__dirname, 'public');
 const SSE_HEARTBEAT_MS = 15_000;
 
 const TICK_MS = 1000;
-const TICKS_PER_YEAR = 48;
+const TICKS_PER_YEAR = 36;
 const TICKS_PER_MONTH = 3;
 const TRADE_FEE_MANUAL_RATE = 0.2;
 const TRADE_FEE_AUTO_RATE = 0.1;

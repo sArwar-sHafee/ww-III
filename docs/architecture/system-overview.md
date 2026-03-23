@@ -1,7 +1,7 @@
 # System Overview
 
 ## Game Summary
-`ww-III` is a two-player, server-authoritative, real-time, tick-based war game. The server advances time every 1 second. A full game year is 48 seconds, divided into 12 months of 3 seconds each.
+`ww-III` is a two-player, server-authoritative, real-time, tick-based war game. The server advances time every 1 second. A full game year is 36 seconds, divided into 12 months of 3 seconds each.
 
 ## High-Level Architecture
 - Server: Node.js HTTP server, authoritative state and tick resolution.

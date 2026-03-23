@@ -7,7 +7,7 @@ The current implementation is a server-authoritative Node.js prototype with SSE 
 
 ## Core Loop
 - 1 tick = 1 second.
-- 48 ticks = 1 year.
+- 36 ticks = 1 year.
 - 3 ticks = 1 month.
 - Buildings, resource deltas, upkeep, queued war actions, population changes, and treasury income resolve on the server.
 

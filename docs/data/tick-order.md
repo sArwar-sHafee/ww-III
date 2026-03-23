@@ -3,7 +3,7 @@
 ## Tick Timing
 - 1 tick = 1 second.
 - 3 ticks = 1 month.
-- 48 ticks = 1 year.
+- 36 ticks = 1 year.
 
 ## Per-Tick Order
 1. Decrement building queues and complete any finished structures.
