@@ -30,7 +30,7 @@ const state = {
 const DEFAULT_API_ORIGIN = 'https://ww-iii.onrender.com';
 const API_ORIGIN = window.WWIII_API_ORIGIN || (window.location.hostname.endsWith('.vercel.app') ? DEFAULT_API_ORIGIN : '');
 const DEFAULT_RESOURCE_CAPACITY = 999999;
-const POPULATION_NUTRITION_PER_YEAR = 0.25;
+const POPULATION_NUTRITION_PER_YEAR = 1.25;
 const emojis = {
   credits: '💳',
   people: '👥',
@@ -638,8 +638,8 @@ function getTradeUnitPrice(resource) {
 }
 
 function getTradeFeeRate(autoMode) {
-  if (autoMode) return state.meta?.tradeFeeAutoRate ?? 0.1;
-  return state.meta?.tradeFeeManualRate ?? 0.2;
+  if (autoMode) return state.meta?.tradeFeeAutoRate ?? 0.05;
+  return state.meta?.tradeFeeManualRate ?? 0.1;
 }
 
 function getTradeFeeLabel(rate) {
@@ -1321,7 +1321,7 @@ function renderTrade() {
   tabContent.innerHTML = `
     <h3>Trade</h3>
     <div class="small">Population generates credits at year end. Manual trades reserve the selected amount now and settle after ${state.meta.tradeDelayMonths || 3} months.</div>
-    <div class="small">Manual trade fee: ${getTradeFeeLabel(state.meta?.tradeFeeManualRate ?? 0.2)} of trade value. Auto trade fee: ${getTradeFeeLabel(state.meta?.tradeFeeAutoRate ?? 0.1)} of trade value.</div>
+    <div class="small">Manual trade fee: ${getTradeFeeLabel(state.meta?.tradeFeeManualRate ?? 0.1)} of trade value. Auto trade fee: ${getTradeFeeLabel(state.meta?.tradeFeeAutoRate ?? 0.05)} of trade value.</div>
     <div class="small">Auto trade cancel fee: ${getAutoTradeCancelFee()} credits.</div>
     <div class="small">Treasury: ${you.credits} credits</div>
     <div class="action-grid">${rows}</div>

@@ -16,7 +16,7 @@
 - Uranium
 
 ## Trade Prices
-Manual trade fee is 20% of trade value. Auto trade fee is 10% of trade value. Percentage fees are rounded up to whole credits. Auto trade cancellation costs 20 credits.
+Manual trade fee is 10% of trade value. Auto trade fee is 5% of trade value. Percentage fees are rounded up to whole credits. Auto trade cancellation costs 20 credits.
 
 | Resource | Price per Unit |
 | --- | --- |

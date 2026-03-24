@@ -12,8 +12,8 @@ const SSE_HEARTBEAT_MS = 15_000;
 const TICK_MS = 1000;
 const TICKS_PER_YEAR = 36;
 const TICKS_PER_MONTH = 3;
-const TRADE_FEE_MANUAL_RATE = 0.2;
-const TRADE_FEE_AUTO_RATE = 0.1;
+const TRADE_FEE_MANUAL_RATE = 0.1;
+const TRADE_FEE_AUTO_RATE = 0.05;
 const AUTO_TRADE_CANCEL_FEE = 20;
 const STARTING_RESOURCES = { nutrition: 200, lumber: 60, steel: 40, copper: 30, alloy: 0, oil: 0, magnet: 0, electricity: 0, glass: 0, polymer: 0, concrete: 0, silicon: 0, uranium: 0 };
 const RESOURCE_KEYS = Object.keys(STARTING_RESOURCES);
@@ -37,7 +37,7 @@ const TRADE_PRICES = {
 const STARTING_POPULATION = 10;
 const STARTING_POPULATION_MAX = 10;
 const STARTING_CREDITS = 0;
-const POPULATION_NUTRITION_PER_YEAR = 0.25;
+const POPULATION_NUTRITION_PER_YEAR = 1.25;
 const INTEL_EMOJIS = {
   people: '👥',
   economy: '💹',
@@ -51,19 +51,19 @@ const INTEL_EMOJIS = {
 };
 
 const BUILDINGS = {
-  farm: { name: 'Farm', cost: { lumber: 10, steel: 7 }, buildTime: 2, capacity: { nutrition: 200 }, production: { nutrition: 1 }, category: 'economy' },
-  lumber_camp: { name: 'Lumber Camp', cost: { lumber: 7, steel: 4 }, buildTime: 1, capacity: { lumber: 150 }, production: { lumber: 2 }, category: 'economy' },
-  steel_mill: { name: 'Steel Mill', cost: { lumber: 15, steel: 7 }, buildTime: 2, capacity: { steel: 100 }, production: { steel: 2 }, category: 'economy' },
-  copper_mine: { name: 'Copper Mine', cost: { lumber: 20, steel: 12 }, buildTime: 2, capacity: { copper: 120 }, production: { copper: 2 }, category: 'economy' },
-  alloy_quarry: { name: 'Alloy Quarry', cost: { lumber: 25, steel: 12 }, buildTime: 2, capacity: { alloy: 80 }, production: { alloy: 3 }, category: 'economy' },
-  oil_rig: { name: 'Oil Rig', cost: { steel: 30, alloy: 20, concrete: 4 }, buildTime: 3, capacity: { oil: 100 }, production: { oil: 3 }, requires: ['electricity'], category: 'economy' },
-  magnet_extractor: { name: 'Magnet Extractor', cost: { steel: 35, alloy: 15, oil: 10, copper: 5 }, buildTime: 3, capacity: { magnet: 60 }, production: { magnet: 3 }, requires: ['advanced_mining'], category: 'economy' },
-  power_plant: { name: 'Power Plant', cost: { steel: 25, oil: 10, copper: 12, concrete: 10 }, buildTime: 2, capacity: { electricity: 80 }, production: { electricity: 3 }, requires: ['electricity'], category: 'economy' },
-  glassworks: { name: 'Glassworks', cost: { lumber: 25, steel: 10, copper: 4 }, buildTime: 2, capacity: { glass: 120 }, production: { glass: 2 }, requires: ['industrial_furnaces'], category: 'economy' },
-  polymer_plant: { name: 'Polymer Plant', cost: { steel: 20, oil: 15, electricity: 3, copper: 4 }, buildTime: 2, capacity: { polymer: 120 }, production: { polymer: 2 }, requires: ['polymer'], category: 'economy' },
-  concrete_plant: { name: 'Concrete Plant', cost: { lumber: 20, steel: 10, electricity: 3 }, buildTime: 2, capacity: { concrete: 180 }, production: { concrete: 3 }, requires: ['industrial_materials'], category: 'economy' },
-  silicon_refinery: { name: 'Silicon Refinery', cost: { steel: 30, alloy: 10, copper: 12, electricity: 5 }, buildTime: 3, capacity: { silicon: 80 }, production: { silicon: 2 }, requires: ['advanced_mining'], category: 'economy' },
-  uranium_mine: { name: 'Uranium Mine', cost: { steel: 50, alloy: 30, concrete: 30, magnet: 10, copper: 15, glass: 10, electricity: 20 }, buildTime: 3, capacity: { uranium: 60 }, production: { uranium: 1 }, requires: ['advanced_mining'], category: 'economy' },
+  farm: { name: 'Farm', cost: { lumber: 10, steel: 7 }, buildTime: 2, capacity: { nutrition: 200 }, production: { nutrition: 5 }, category: 'economy' },
+  lumber_camp: { name: 'Lumber Camp', cost: { lumber: 7, steel: 4 }, buildTime: 1, capacity: { lumber: 150 }, production: { lumber: 10 }, category: 'economy' },
+  steel_mill: { name: 'Steel Mill', cost: { lumber: 15, steel: 7 }, buildTime: 2, capacity: { steel: 100 }, production: { steel: 10 }, category: 'economy' },
+  copper_mine: { name: 'Copper Mine', cost: { lumber: 20, steel: 12 }, buildTime: 2, capacity: { copper: 120 }, production: { copper: 10 }, category: 'economy' },
+  alloy_quarry: { name: 'Alloy Quarry', cost: { lumber: 25, steel: 12 }, buildTime: 2, capacity: { alloy: 80 }, production: { alloy: 15 }, category: 'economy' },
+  oil_rig: { name: 'Oil Rig', cost: { steel: 30, alloy: 20, concrete: 4 }, buildTime: 3, capacity: { oil: 100 }, production: { oil: 15 }, requires: ['electricity'], category: 'economy' },
+  magnet_extractor: { name: 'Magnet Extractor', cost: { steel: 35, alloy: 15, oil: 10, copper: 5 }, buildTime: 3, capacity: { magnet: 60 }, production: { magnet: 15 }, requires: ['advanced_mining'], category: 'economy' },
+  power_plant: { name: 'Power Plant', cost: { steel: 25, oil: 10, copper: 12, concrete: 10 }, buildTime: 2, capacity: { electricity: 80 }, production: { electricity: 15 }, requires: ['electricity'], category: 'economy' },
+  glassworks: { name: 'Glassworks', cost: { lumber: 25, steel: 10, copper: 4 }, buildTime: 2, capacity: { glass: 120 }, production: { glass: 10 }, requires: ['industrial_furnaces'], category: 'economy' },
+  polymer_plant: { name: 'Polymer Plant', cost: { steel: 20, oil: 15, electricity: 3, copper: 4 }, buildTime: 2, capacity: { polymer: 120 }, production: { polymer: 10 }, requires: ['polymer'], category: 'economy' },
+  concrete_plant: { name: 'Concrete Plant', cost: { lumber: 20, steel: 10, electricity: 3 }, buildTime: 2, capacity: { concrete: 180 }, production: { concrete: 15 }, requires: ['industrial_materials'], category: 'economy' },
+  silicon_refinery: { name: 'Silicon Refinery', cost: { steel: 30, alloy: 10, copper: 12, electricity: 5 }, buildTime: 3, capacity: { silicon: 80 }, production: { silicon: 10 }, requires: ['advanced_mining'], category: 'economy' },
+  uranium_mine: { name: 'Uranium Mine', cost: { steel: 50, alloy: 30, concrete: 30, magnet: 10, copper: 15, glass: 10, electricity: 20 }, buildTime: 3, capacity: { uranium: 60 }, production: { uranium: 5 }, requires: ['advanced_mining'], category: 'economy' },
   shelter: { name: 'Shelter', cost: { lumber: 20, steel: 7, concrete: 3 }, buildTime: 1, category: 'support' },
   barracks: { name: 'Military Camp', cost: { lumber: 25, steel: 15, concrete: 10 }, buildTime: 2, category: 'support' },
   factory: { name: 'Factory', cost: { steel: 25, alloy: 20, oil: 10, copper: 15, concrete: 8 }, buildTime: 3, requires: ['electricity'], category: 'support' },
@@ -77,7 +77,7 @@ const UNITS = {
     name: 'Infantry',
     section: 'military',
     cost: { nutrition: 6, steel: 4 },
-    upkeep: { nutrition: 0.15 },
+    upkeep: { nutrition: 0.75 },
     attack: 10,
     defense: 5,
     combatWeight: 10,
@@ -89,7 +89,7 @@ const UNITS = {
     name: 'Special Force',
     section: 'military',
     cost: { nutrition: 8, steel: 8, electricity: 2, polymer: 2 },
-    upkeep: { nutrition: 0.25, electricity: 0.1 },
+    upkeep: { nutrition: 1.25, electricity: 0.5 },
     attack: 22,
     defense: 14,
     combatWeight: 22,
@@ -102,7 +102,7 @@ const UNITS = {
     name: 'Tank',
     section: 'military',
     cost: { steel: 12, oil: 8, copper: 4 },
-    upkeep: { oil: 0.1, steel: 0.05 },
+    upkeep: { oil: 0.5, steel: 0.25 },
     attack: 25,
     defense: 12,
     combatWeight: 28,
@@ -115,7 +115,7 @@ const UNITS = {
     name: 'War Ship',
     section: 'military',
     cost: { steel: 50, alloy: 30, oil: 20, concrete: 8 },
-    upkeep: { oil: 0.15, electricity: 0.05 },
+    upkeep: { oil: 0.75, electricity: 0.25 },
     attack: 50,
     defense: 25,
     combatWeight: 52,
@@ -128,7 +128,7 @@ const UNITS = {
     name: 'Submarine',
     section: 'military',
     cost: { steel: 60, alloy: 35, oil: 25, copper: 10 },
-    upkeep: { oil: 0.2, electricity: 0.08 },
+    upkeep: { oil: 1, electricity: 0.4 },
     attack: 80,
     defense: 40,
     combatWeight: 78,
@@ -141,7 +141,7 @@ const UNITS = {
     name: 'Fighter Zed',
     section: 'military',
     cost: { alloy: 40, oil: 20, silicon: 10, copper: 8, glass: 6 },
-    upkeep: { oil: 0.15, electricity: 0.1 },
+    upkeep: { oil: 0.75, electricity: 0.5 },
     attack: 40,
     defense: 20,
     combatWeight: 42,
@@ -154,7 +154,7 @@ const UNITS = {
     name: 'Attack Helicopter',
     section: 'military',
     cost: { steel: 20, alloy: 25, oil: 15, polymer: 6 },
-    upkeep: { oil: 0.12, polymer: 0.05 },
+    upkeep: { oil: 0.6, polymer: 0.25 },
     attack: 60,
     defense: 30,
     combatWeight: 58,
@@ -167,7 +167,7 @@ const UNITS = {
     name: 'Combat Drone',
     section: 'military',
     cost: { alloy: 15, electricity: 10, silicon: 8, copper: 6 },
-    upkeep: { electricity: 0.15, oil: 0.05 },
+    upkeep: { electricity: 0.75, oil: 0.25 },
     attack: 35,
     defense: 18,
     combatWeight: 32,
@@ -204,12 +204,12 @@ const UNITS = {
       research_center: { disableYears: 2 }
     }
   },
-  scout_drone: { name: 'Scout Drone', section: 'military', cost: { oil: 5, electricity: 3, copper: 2, glass: 2 }, upkeep: { electricity: 0.08 }, requiresBuilding: 'radar_station' },
+  scout_drone: { name: 'Scout Drone', section: 'military', cost: { oil: 5, electricity: 3, copper: 2, glass: 2 }, upkeep: { electricity: 0.4 }, requiresBuilding: 'radar_station' },
   anti_missile_battery: {
     name: 'Anti-Missile Battery',
     section: 'defence',
     cost: { steel: 45, oil: 20, magnet: 18, copper: 18 },
-    upkeep: { electricity: 0.08 },
+    upkeep: { electricity: 0.4 },
     requiresTech: 'guided_missiles',
     defenceAssignable: true,
     defense: 24,
@@ -221,7 +221,7 @@ const UNITS = {
     name: 'Land Mine',
     section: 'defence',
     cost: { lumber: 60, steel: 40, polymer: 16 },
-    upkeep: { polymer: 0.04 },
+    upkeep: { polymer: 0.2 },
     defenceAssignable: true,
     defense: 18,
     combatWeight: 12,
@@ -232,7 +232,7 @@ const UNITS = {
     name: 'Anti-Tank Squad',
     section: 'defence',
     cost: { nutrition: 10, steel: 12, polymer: 6 },
-    upkeep: { nutrition: 0.15 },
+    upkeep: { nutrition: 0.75 },
     defense: 18,
     combatWeight: 12,
     requiresTech: 'tanks',
@@ -255,7 +255,7 @@ const UNITS = {
     name: 'Air Defence Gun',
     section: 'defence',
     cost: { steel: 26, alloy: 14, electricity: 10, copper: 10 },
-    upkeep: { electricity: 0.08, copper: 0.05 },
+    upkeep: { electricity: 0.4, copper: 0.25 },
     defense: 28,
     combatWeight: 19,
     requiresTech: 'guided_missiles',
@@ -267,7 +267,7 @@ const UNITS = {
     name: 'Border Guard',
     section: 'defence',
     cost: { nutrition: 10, polymer: 6 },
-    upkeep: { nutrition: 0.15 },
+    upkeep: { nutrition: 0.75 },
     defense: 12,
     combatWeight: 8,
     requiresBuilding: 'barracks',
@@ -321,10 +321,10 @@ const DEFENCE_ASSIGNABLE_IDS = [...DEFENCE_BUILDING_IDS, ...DEFENCE_ASSIGNABLE_U
 const ASSAULT_DEFENCE_ROUNDS = 3;
 
 const STARTING_BUILDINGS = {
-  farm: 1,
-  lumber_camp: 1,
-  steel_mill: 1,
-  copper_mine: 1,
+  farm: 3,
+  lumber_camp: 0,
+  steel_mill: 0,
+  copper_mine: 0,
   alloy_quarry: 0,
   oil_rig: 0,
   magnet_extractor: 0,

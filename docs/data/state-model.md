@@ -62,6 +62,6 @@ The server is authoritative. Clients only receive a player-scoped view of the ro
 - Population max: 10
 - Credits: 0
 - Resources: nutrition 200, lumber 60, steel 40, copper 30, all others 0
-- Buildings: farm 1, lumber_camp 1, steel_mill 1, copper_mine 1, shelter 2, all others 0
+- Buildings: farm 3, lumber_camp 0, steel_mill 0, copper_mine 0, shelter 2, all others 0
 - Units: all 0
 - Research: none

@@ -3,19 +3,19 @@
 Production is computed every tick and applied as `1/36` of yearly values.
 
 ## Base Production (per year, per building)
-- Farm: nutrition +1
-- Lumber Camp: lumber +2
-- Steel Mill: steel +2
-- Copper Mine: copper +2
-- Alloy Quarry: alloy +3
-- Oil Rig: oil +3
-- Magnet Extractor: magnet +3
-- Power Plant: electricity +3
-- Glassworks: glass +2
-- Polymer Plant: polymer +2
-- Concrete Plant: concrete +3
-- Silicon Refinery: silicon +2
-- Uranium Mine: uranium +1
+- Farm: nutrition +5
+- Lumber Camp: lumber +10
+- Steel Mill: steel +10
+- Copper Mine: copper +10
+- Alloy Quarry: alloy +15
+- Oil Rig: oil +15
+- Magnet Extractor: magnet +15
+- Power Plant: electricity +15
+- Glassworks: glass +10
+- Polymer Plant: polymer +10
+- Concrete Plant: concrete +15
+- Silicon Refinery: silicon +10
+- Uranium Mine: uranium +5
 
 ## Production Modifiers
 - Basic Tools research: +20% to building production.
