@@ -1,5 +1,8 @@
 # Game Documentation: `ww-III`
 
+## Gameplay
+- https://ww-iii.vercel.app
+
 ## Overview
 `ww-III` is a text-based 2-player real-time strategy game. One player creates a 4-digit room code, the other joins, and both sides manage resources, supports, military forces, defences, research, trade, and queued war actions.
 

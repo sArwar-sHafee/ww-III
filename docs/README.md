@@ -2,9 +2,6 @@
 
 This documentation describes the current `ww-III` prototype as implemented in `server.js` and `public/app.js`.
 
-## Gameplay
-- https://ww-iii.vercel.app
-
 ## What to Read First
 - `docs/architecture/system-overview.md`
 - `docs/data/state-model.md`
